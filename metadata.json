@@ -1,0 +1,6 @@
+{
+  "name": "LEXAI UZ",
+  "description": "O‘zbekiston Respublikasi qonunchiligi (Lex.uz) bo‘yicha professional AI-yuridik konsultant, RAG qidiruv tizimi, shartnomalar tahlili va yuridik hujjatlar platformasi.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
