@@ -74,7 +74,7 @@ export function scanDocumentForLegalIssuesOffline(
       category: 'Fors-major va Majburiyatlar',
       issueTitle: 'Fors-major (Yengib bo‘lmas kuch) bandi mavjud emas',
       lawViolationCitation: 'O‘zR Fuqarolik kodeksi 333-moddasi, 3-qism',
-      lexUrl: 'https://lex.uz/docs/111189#152840',
+      lexUrl: 'https://lex.uz/docs/111189',
       explanation: 'Fors-major holatlari (tabiiy ofatlar, davlat cheklovlari) yuz berganda taraflarni javobgarlikdan ozod qilish va O‘zR Savdo-sanoat palatasi ma‘lumotnomasini olish tartibi belgilanmagan.',
       suggestedReplacement: `\n\nFORS-MAJOR (YENGIB BO‘LMAS KUCH) HOLATLARI:
 1. Taraflar o‘zlarining ixtiyoriga bog‘liq bo‘lmagan, oldindan bilib yoki bartaraf etib bo‘lmaydigan yengib bo‘lmas kuch (fors-major: yong‘in, toshqin, zilzila, epidemiya, davlat taqiqlari) holatlarida shartnoma majburiyatlarini qisman yoki to‘liq bajarmaganlik uchun javobgarlikdan ozod qilinadilar.
@@ -154,7 +154,7 @@ Taraflar ushbu shartnoma bo‘yicha o‘z majburiyatlarini bajarishda O‘zbekis
           issueTitle: 'Ta‘til muddati yangi Mehnat kodeksida belgilangan eng kam 21 kundan kam',
           problematicText: prob,
           lawViolationCitation: 'O‘zR yangi Mehnat kodeksi 216-moddasi',
-          lexUrl: 'https://lex.uz/docs/6257288#6259400',
+          lexUrl: 'https://lex.uz/docs/6257288',
           explanation: 'Yangi Mehnat kodeksining 216-moddasiga binoan, xodimga har yili beriladigan asosiy mehnat ta‘tilining eng kam muddati 21 kalendar kundan kam bo‘lishi mumkin emas. Qonundan kam muddat belgilash qonunga ziddir.',
           suggestedReplacement: prob.replace(new RegExp(`${days}\\s*(kun|kalendar kun)`, 'i'), '21 kalendar kun'),
           actionType: 'REPLACE',
@@ -177,7 +177,7 @@ Taraflar ushbu shartnoma bo‘yicha o‘z majburiyatlarini bajarishda O‘zbekis
           issueTitle: 'Sinov muddati oddiy xodimlar uchun 3 oydan ortiq belgilangan',
           problematicText: prob,
           lawViolationCitation: 'O‘zR Mehnat kodeksi 129-130-moddalari',
-          lexUrl: 'https://lex.uz/docs/6257288#6258700',
+          lexUrl: 'https://lex.uz/docs/6257288',
           explanation: 'Mehnat kodeksining 129-moddasiga binoan sinov muddati 3 oydan oshmasligi kerak (faqat tashkilot rahbari va bosh buxgalter uchun 6 oygacha ruxsat etiladi).',
           suggestedReplacement: prob.replace(new RegExp(`${months}\\s*(oy|oylik)`, 'i'), '3 oy'),
           actionType: 'REPLACE',

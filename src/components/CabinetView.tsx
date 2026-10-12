@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { LegalCitation } from '../types';
 import { LexVerificationBadge } from './LexVerificationBadge';
+import { LexCanonicalLink } from './LexCanonicalLink';
 
 interface CabinetViewProps {
   savedCitations: LegalCitation[];
@@ -111,15 +112,15 @@ export const CabinetView: React.FC<CabinetViewProps> = ({
               </div>
 
               <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2 text-xs">
-                <a
-                  href={cite.lexUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-indigo-300 hover:underline font-medium text-xs"
-                >
-                  <span>Lex.uz da ochish</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
+                <LexCanonicalLink
+                  url={cite.lexUrl}
+                  documentName={cite.documentName}
+                  articleNumber={cite.articleNumber}
+                  label="Lex.uz da ochish"
+                  size="xs"
+                  variant="ghost"
+                  showCopyButton={true}
+                />
 
                 <div className="flex items-center gap-1.5">
                   <button

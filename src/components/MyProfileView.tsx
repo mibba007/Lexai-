@@ -28,7 +28,9 @@ import {
   Sparkles,
   Lock,
   Eye,
-  Briefcase
+  Briefcase,
+  Bell,
+  Clock
 } from 'lucide-react';
 import {
   UserLegalProfile,
@@ -37,6 +39,8 @@ import {
   formatIndividualRequisites,
   formatBusinessRequisites
 } from '../utils/userProfileManager';
+import { SmartDocumentAlerts } from './SmartDocumentAlerts';
+import { useDocumentExpirationAlerts } from '../utils/documentExpirationManager';
 
 interface MyProfileViewProps {
   onNavigateToGenerator: () => void;
@@ -46,13 +50,14 @@ export const MyProfileView: React.FC<MyProfileViewProps> = ({
   onNavigateToGenerator,
 }) => {
   const { profile, saveProfile, resetProfile } = useUserProfile();
+  const { totalAlertCount, urgentCount } = useDocumentExpirationAlerts();
 
   // Form states
   const [formData, setFormData] = useState<UserLegalProfile>(() => {
     return profile || DEFAULT_SAMPLE_USER_PROFILE;
   });
 
-  const [activeTab, setActiveTab] = useState<'individual' | 'business'>('individual');
+  const [activeTab, setActiveTab] = useState<'individual' | 'business' | 'notifications'>('individual');
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -183,41 +188,61 @@ export const MyProfileView: React.FC<MyProfileViewProps> = ({
         <div className="lg:col-span-8 space-y-6">
           
           {/* Sub-profile Tabs */}
-          <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 p-1.5 rounded-2xl">
+          <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 p-1.5 rounded-2xl flex-wrap sm:flex-nowrap">
             <button
               onClick={() => setActiveTab('individual')}
               id="tab-profile-individual"
-              className={`flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+              className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
                 activeTab === 'individual'
                   ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-md shadow-cyan-950/40'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
               }`}
             >
               <User className="w-4 h-4" />
-              <span>Jismoniy Shaxs Rekvizitlari</span>
+              <span>Jismoniy Shaxs</span>
             </button>
 
             <button
               onClick={() => setActiveTab('business')}
               id="tab-profile-business"
-              className={`flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+              className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
                 activeTab === 'business'
                   ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-md shadow-cyan-950/40'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
               }`}
             >
               <Building2 className="w-4 h-4" />
-              <span>Tashkilot / Biznes Rekvizitlari</span>
+              <span>Korxona / Biznes</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('notifications')}
+              id="tab-profile-notifications"
+              className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                activeTab === 'notifications'
+                  ? 'bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-500 text-slate-950 shadow-md shadow-amber-950/40 font-extrabold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}
+            >
+              <Bell className="w-4 h-4 text-amber-400" />
+              <span>Smart Eslatmalar</span>
+              {totalAlertCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-600 text-white animate-pulse">
+                  {totalAlertCount}
+                </span>
+              )}
             </button>
           </div>
 
-          {/* Form Card */}
-          <form onSubmit={handleSave} className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-7 space-y-5 shadow-xl">
-            
-            {activeTab === 'individual' ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                  <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+          {/* Conditional View: Smart Notifications Dashboard vs Legal Profile Form */}
+          {activeTab === 'notifications' ? (
+            <SmartDocumentAlerts onNavigateToGenerator={onNavigateToGenerator} />
+          ) : (
+            <form onSubmit={handleSave} className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-7 space-y-5 shadow-xl">
+              {activeTab === 'individual' ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
                     <CreditCard className="w-4 h-4 text-cyan-400" />
                     Pasport, PINFL va Shaxsiy Ma‘lumotlar
                   </h3>
@@ -531,11 +556,15 @@ export const MyProfileView: React.FC<MyProfileViewProps> = ({
               </div>
             </div>
           </form>
+          )}
         </div>
 
         {/* Right Preview Column (4 cols) */}
         <div className="lg:col-span-4 space-y-5">
           
+          {/* Real-time Expiration Alerts widget in sidebar */}
+          <SmartDocumentAlerts compactMode onNavigateToGenerator={onNavigateToGenerator} />
+
           {/* Quick Auto-fill Action Card */}
           <div className="bg-gradient-to-br from-amber-950/30 via-slate-900 to-slate-900 border border-amber-500/40 rounded-3xl p-5 sm:p-6 shadow-xl space-y-3.5 ring-1 ring-amber-500/20">
             <div className="flex items-center gap-2 text-amber-400">

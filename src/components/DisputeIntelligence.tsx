@@ -28,6 +28,7 @@ import {
 import { DisputeAuditResult, DisputePartyRole } from '../types';
 import { DISPUTE_PRESET_CASES, DisputePresetCase } from '../data/disputePresets';
 import { synthesizeClientDisputeAudit } from '../utils/offlineLegalEngine';
+import { LexCanonicalLink } from './LexCanonicalLink';
 
 interface DisputeIntelligenceProps {
   onNavigateToDocumentGenerator?: (docType?: string) => void;
@@ -712,15 +713,14 @@ export const DisputeIntelligence: React.FC<DisputeIntelligenceProps> = ({
                               <strong className="text-cyan-300">{ground.lexArticle}</strong>
                             </div>
                             {ground.lexUrl && (
-                              <a
-                                href={ground.lexUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-medium hover:underline"
-                              >
-                                <span>Lex.uz da ko‘rish</span>
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
+                              <LexCanonicalLink
+                                url={ground.lexUrl}
+                                documentName={ground.lexArticle}
+                                label="Lex.uz da ko‘rish"
+                                size="xs"
+                                variant="ghost"
+                                showCopyButton={true}
+                              />
                             )}
                           </div>
                         </div>

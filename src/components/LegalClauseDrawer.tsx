@@ -21,6 +21,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { LEGAL_CLAUSE_BANK, LegalClauseSnippet } from '../data/legalClauseBank';
+import { LexCanonicalLink } from './LexCanonicalLink';
 
 interface LegalClauseDrawerProps {
   onInsertClause: (clauseText: string, sectionTitle?: string) => void;
@@ -184,16 +185,14 @@ export const LegalClauseDrawer: React.FC<LegalClauseDrawerProps> = ({
                     <span className="font-medium text-slate-300">{clause.applicableArticle}</span>
                   </div>
 
-                  <a
-                    href={clause.lexUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex items-center gap-0.5 text-cyan-400 hover:text-cyan-300 transition font-medium"
-                  >
-                    <span>Lex.uz</span>
-                    <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
+                  <LexCanonicalLink
+                    url={clause.lexUrl}
+                    documentName={clause.applicableArticle}
+                    label="Lex.uz"
+                    size="xs"
+                    variant="ghost"
+                    showCopyButton={true}
+                  />
                 </div>
               </div>
             );

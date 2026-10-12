@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { CodexArticle, LegalCategory } from '../types';
 import { UZBEKISTAN_LAWS_DATABASE, searchLawsDatabase } from '../data/lawsDatabase';
+import { LexCanonicalLink } from './LexCanonicalLink';
 
 interface CodexExplorerProps {
   onSaveCitation: (citation: any) => void;
@@ -217,15 +218,15 @@ export const CodexExplorer: React.FC<CodexExplorerProps> = ({
                     )}
                   </button>
 
-                  <a
-                    href={selectedArticle.lexUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-900/70 hover:bg-indigo-800 text-indigo-200 text-xs font-semibold border border-indigo-700/60 transition"
-                  >
-                    <span>Lex.uz da ko‘rish</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
+                  <LexCanonicalLink
+                    url={selectedArticle.lexUrl}
+                    documentName={selectedArticle.codeName}
+                    articleNumber={selectedArticle.articleNumber}
+                    label="Lex.uz da ko‘rish"
+                    size="md"
+                    variant="outline"
+                    showCopyButton={true}
+                  />
                 </div>
               </div>
 

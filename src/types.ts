@@ -12,7 +12,7 @@ export type LegalCategory =
   | 'court';       // Sud protsessi va ijro
 
 export type LanguageMode = 'uz_lat' | 'uz_kir' | 'ru' | 'en';
-export type NavigationTab = 'chat' | 'forensic' | 'dispute' | 'codex' | 'contract' | 'generator' | 'calculators' | 'cabinet' | 'profile';
+export type NavigationTab = 'chat' | 'forensic' | 'dispute' | 'codex' | 'contract' | 'generator' | 'calculators' | 'audit' | 'cabinet' | 'profile';
 
 export interface AudioForensicMetadata {
   recordingDate?: string;
@@ -120,25 +120,68 @@ export interface LegalCitation {
   paragraphNumber?: string;  // masalan: "4-band"
   quote?: string;            // Aniq normativ matn
   editionDate: string;       // masalan: "2023-yil 30-apreldan amalda"
-  lexUrl: string;            // masalan: "https://lex.uz/docs/6257288#6258900"
-  status: 'CURRENT' | 'HISTORICAL';
+  lexUrl: string;            // masalan: "https://lex.uz/docs/6257288"
+  status: 'CURRENT' | 'HISTORICAL' | 'REPEALED' | 'UNVERIFIED';
   relevanceScore?: number;
+  lawNumber?: string;        // masalan: "O‘RQ-798-son", "PF-5624", "VMQ-837"
+  isLexVerified?: boolean;   // Lex.uz rasmiy amaldagi tahrir tekshiruvi tasdiqlangan
+  verifiedDetails?: string;  // masalan: "Lex.uz: Amaldagi tahrir (2026-yil holatiga ko‘ra)"
+  repealedNote?: string;     // Agar eski yoki bekor bo‘lgan norma o‘rniga yangisi qo‘llanilgan bo‘lsa tushuntirish
+  versionStamp?: string;     // AI taqdim etgan versiya tamg‘asi (masalan: "AI:MK:ORQ-798:161:2023.04.30:CURRENT")
+  versionComparison?: MetadataVersionStampComparison; // Real-vaqt Lex.uz solishtiruv natijasi
+  verdict?: 'VERIFIED_CURRENT' | 'VERIFIED_HISTORICAL' | 'VERIFIED_AMENDED' | 'REPEALED' | 'FUTURE_EFFECTIVE' | 'ARTICLE_NOT_FOUND' | 'TEXT_MISMATCH' | 'URL_MISMATCH' | 'UNVERIFIED' | 'SOURCE_UNAVAILABLE' | 'STATUS_UNKNOWN' | 'CITATION_MISMATCH' | 'STALE_CACHE';
+  evidenceSummary?: string;
 }
 
-export type LexVerificationStatus = 'ACTIVE' | 'RECENTLY_AMENDED' | 'REPEALED' | 'REVISED' | 'CHECKING' | 'ERROR';
+export type LexVerificationStatus = 
+  | 'ACTIVE' 
+  | 'RECENTLY_AMENDED' 
+  | 'REPEALED' 
+  | 'REVISED' 
+  | 'CHECKING' 
+  | 'ERROR'
+  | 'UNVERIFIED'
+  | 'SOURCE_UNAVAILABLE'
+  | 'ARTICLE_NOT_FOUND'
+  | 'CITATION_MISMATCH'
+  | 'TEXT_MISMATCH'
+  | 'FUTURE_EFFECTIVE'
+  | 'STATUS_UNKNOWN';
+
+export interface MetadataVersionStampComparison {
+  aiVersionStamp: string;              // AI taqdim etgan versiya tamg‘asi
+  lexVersionStamp: string;             // Rasmiy Lex.uz bazasidagi amaldagi versiya tamg‘asi
+  isVersionMatch: boolean;             // AI taqdim etgan norma Lex.uz amaldagi 'Current' holati bilan to‘liq mosmi
+  lexCurrentStatus: 'CURRENT' | 'HISTORICAL' | 'REPEALED' | 'RECENTLY_AMENDED' | 'UNVERIFIED'; // Lex.uz dagi amaldagi rasmiy maqomi
+  lexEffectiveDate: string;            // Rasmiy kuchga kirgan sana
+  aiEditionDate: string;               // AI tomonidan ko‘rsatilgan sana
+  lastAmendedLaw?: string;             // So‘nggi o‘zgartirish kiritgan Qonun
+  versionStampHash: string;            // Metadata tamg‘a xeshi/identifikatori
+  discrepancies: string[];             // Aniqlangan tafovutlar yoki kamchiliklar ro‘yxati
+  isCurrent: boolean;                  // Hozirgi kunda Lex.uz da amaldami
+  verifiedAt: string;                  // Real-vaqt verifikatsiya vaqti (ISO)
+}
 
 export interface LexVerificationResult {
   lexUrl: string;
   documentName: string;
   articleNumber: string;
-  status: 'ACTIVE' | 'RECENTLY_AMENDED' | 'REPEALED' | 'REVISED';
+  status: LexVerificationStatus;
   statusLabel: string;
   isLatestEdition: boolean;
   lastAmendedLaw?: string;
   lastVerifiedAt: string;
   notes: string;
   officialSource: string;
-  confidence: 'HIGH' | 'VERIFIED';
+  confidence: 'HIGH' | 'VERIFIED' | 'UNVERIFIED';
+  versionComparison?: MetadataVersionStampComparison;
+  aiVersionStamp?: string;
+  lexVersionStamp?: string;
+  isVersionMatch?: boolean;
+  verdict?: string;
+  evidenceSummary?: string;
+  discrepancies?: string[];
+  failureReason?: string;
 }
 
 export interface AudioSentenceAnalysis {
@@ -175,6 +218,14 @@ export interface LegalAnalysisResult {
     keyLegalFindings?: string[];
     evidentiaryValue?: string;
     audioEvidenceLegalityRules?: string[];
+  };
+  overallVersionStampAudit?: {
+    totalChecked: number;
+    matchedCurrent: number;
+    repealedOrOutdated: number;
+    allMatchCurrent: boolean;
+    auditedAt: string;
+    lexRegistryVersion: string;
   };
 }
 
@@ -213,6 +264,8 @@ export interface CodexArticle {
   lexUrl: string;
   keywords: string[];
   category: LegalCategory;
+  lawNumber?: string;        // masalan: "O‘RQ-798-son", "PF-5624", "FK 111189"
+  warningNote?: string;      // Eski norma haqida ogohlantirish (masalan: "Eski 1995-yilgi MK 100-moddasi o‘rniga amalda")
 }
 
 export interface ContractClauseAudit {

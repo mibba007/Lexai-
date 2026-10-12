@@ -36,6 +36,7 @@ import {
   SmartLegislationProfile 
 } from '../data/smartTemplatesData';
 import { LegalDocumentTemplate, LegalCategory } from '../types';
+import { LexCanonicalLink } from './LexCanonicalLink';
 
 interface SmartTemplatesModalProps {
   isOpen: boolean;
@@ -345,16 +346,14 @@ export const SmartTemplatesModal: React.FC<SmartTemplatesModalProps> = ({
                             <Scale className="w-3.5 h-3.5" />
                             Qonuniy Majburiy Shartlar (Lex.uz)
                           </span>
-                          <a
-                            href={smartItem.lexUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-slate-500 hover:text-cyan-400 transition flex items-center gap-1 text-[10px]"
-                            title="Lex.uz rasmiy qonun matnini ochish"
-                          >
-                            <span>Norma</span>
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
+                          <LexCanonicalLink
+                            url={smartItem.lexUrl}
+                            documentName={smartItem.governingLaw}
+                            label="Norma"
+                            size="xs"
+                            variant="ghost"
+                            showCopyButton={true}
+                          />
                         </div>
                         <ul className="text-[11px] text-slate-400 space-y-1">
                           {smartItem.statutoryMandatoryClauses.slice(0, 3).map((clause, idx) => (

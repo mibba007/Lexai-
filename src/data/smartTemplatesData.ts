@@ -54,7 +54,7 @@ export const SMART_TEMPLATES_LIBRARY: SmartTemplateDefinition[] = [
     popularRank: 1,
     governingLaw: 'Yangi Mehnat kodeksi 104-108, 110, 129, 216, 253, 452-moddalar; VM 971-son qarori (YAMMT)',
     governingCodeName: 'O‘zR Yangi Mehnat Kodeksi',
-    lexUrl: 'https://lex.uz/docs/6257288#6258520',
+    lexUrl: 'https://lex.uz/docs/6257288',
     standardClassification: 'O‘zDSt 1157:2008 / MK-104 / YAMMT',
     summary: 'Yangi Mehnat kodeksi talablariga to‘liq javob beruvchi, 40 soatlik haftalik rejim, 21 kunlik ta‘til, 3 oylik sinov va YAMMT elektron daftarchasi mezonlari bilan ta‘minlangan davlat standarti.',
     statutoryMandatoryClauses: [
@@ -74,7 +74,7 @@ export const SMART_TEMPLATES_LIBRARY: SmartTemplateDefinition[] = [
         badge: 'MK 104-108 Asosiy',
         description: 'Tashkilotda to‘liq bandlik: 40 soatlik ish haftasi, 21 kalendar kunlik asosiy ta‘til, 3 oylik dastlabki sinov va 2 hissa ishdan tashqari haq.',
         statutoryBasis: 'Mehnat kodeksi 104, 107, 129, 182, 216, 253, 262-moddalar',
-        lexUrl: 'https://lex.uz/docs/6257288#6258520',
+        lexUrl: 'https://lex.uz/docs/6257288',
         keyLegalGuarantees: [
           'Haftasiga 40 soatdan oshmaydigan normal ish vaqti (MK 182)',
           'Yillik kamida 21 kalendar kunlik haq to‘lanadigan ta‘til (MK 216)',
@@ -109,7 +109,7 @@ export const SMART_TEMPLATES_LIBRARY: SmartTemplateDefinition[] = [
         badge: 'MK 452 Masofaviy',
         description: 'Axborot-telekommunikatsiya tarmoqlari orqali masofaviy ishlash: asbob-uskuna kompensatsiyasi, erkin ish grafigi va elektron hisobot.',
         statutoryBasis: 'Mehnat kodeksi 452, 453, 454, 455, 456-moddalar (Masofaviy ishchilar mehnati)',
-        lexUrl: 'https://lex.uz/docs/6257288#6261540',
+        lexUrl: 'https://lex.uz/docs/6257288',
         keyLegalGuarantees: [
           'Masofadan ishlashda xodim o‘z ish vaqtini mustaqil taqsimlaydi (MK 455)',
           'Shaxsiy asbob-uskuna va internet aloqasi uchun kompensatsiya (MK 454)',
@@ -144,7 +144,7 @@ export const SMART_TEMPLATES_LIBRARY: SmartTemplateDefinition[] = [
         badge: 'MK 432 O‘rindoshlik',
         description: 'Asosiy ishdan bo‘sh vaqtda ishlash: haftasiga ko‘pi bilan 20 soat (kuniga 4 soat) me‘yori, mutanosib haq to‘lash.',
         statutoryBasis: 'Mehnat kodeksi 432-442 moddalar (O‘rindoshlik asosida ishlovchilar)',
-        lexUrl: 'https://lex.uz/docs/6257288#6261300',
+        lexUrl: 'https://lex.uz/docs/6257288',
         keyLegalGuarantees: [
           'Ish vaqti kunlik 4 soat, haftasiga 20 soatdan oshmasligi shart (MK 437)',
           'Ishlangan vaqtga mutanosib ravishda oylik haq kafolati (MK 438)',
@@ -187,7 +187,7 @@ export const SMART_TEMPLATES_LIBRARY: SmartTemplateDefinition[] = [
     popularRank: 2,
     governingLaw: 'Fuqarolik kodeksi 535-557, 573-578, 600-614 moddalar; Soliq kodeksi 369-modda (ijara.soliq.uz)',
     governingCodeName: 'O‘zR Fuqarolik Kodeksi & Soliq Kodeksi',
-    lexUrl: 'https://lex.uz/docs/111189#160800',
+    lexUrl: 'https://lex.uz/docs/111189',
     standardClassification: 'O‘zDSt 1157:2008 / FK-600 / SOLIQ-IJARA',
     summary: 'Turar joy va noturar joy (ofis)ni ijaraga berish uchun soliq inspeksiyasi (ijara.soliq.uz) ro‘yxatidan o‘tkazishga to‘liq mos, kafolat depoziti, hisoblagich to‘lovlari va 1 oylik ogohlantirish shartlariga ega yuridik shablon.',
     statutoryMandatoryClauses: [
@@ -206,7 +206,7 @@ export const SMART_TEMPLATES_LIBRARY: SmartTemplateDefinition[] = [
         badge: 'FK 600 Soliqqa mos',
         description: 'Jismoniy shaxslar o‘rtasida xonadonni ijaraga berish: 11 oylik muddat, 1 oylik kafolat depoziti, har oyning 5-kunigacha to‘lov va hisoblagich hisoblari.',
         statutoryBasis: 'Fuqarolik kodeksi 600, 608, 612-moddalar; Soliq kodeksi 369-modda',
-        lexUrl: 'https://lex.uz/docs/111189#160800',
+        lexUrl: 'https://lex.uz/docs/111189',
         keyLegalGuarantees: [
           '11 oylik qonuniy muddat — ortiqcha notarial va kadastr yuklamasisiz qonuniy ro‘yxat (FK 600)',
           'ijara.soliq.uz portalida avtomatik hisobga qo‘yish kafolati',
@@ -229,7 +229,7 @@ export const SMART_TEMPLATES_LIBRARY: SmartTemplateDefinition[] = [
         badge: 'FK 573 Tijorat bino',
         description: 'Tashkilotlar va YaTTlar o‘rtasida biznes ofis, ombor yoki do‘kon ijarasi: bank o‘tkazmasi, topshirish dalolatnomasi va iqtisodiy sud tartibi.',
         statutoryBasis: 'Fuqarolik kodeksi 535, 573, 577, 578-moddalar (Bino va inshootlarni ijaraga berish)',
-        lexUrl: 'https://lex.uz/docs/111189#160200',
+        lexUrl: 'https://lex.uz/docs/111189',
         keyLegalGuarantees: [
           'Ikki tomonlama topshirish-qabul qilish dalolatnomasi (Akt) majburiyligi (FK 577)',
           'Bank orqali elektron hisobvaraq-faktura (EHF) asosida hisob-kitob',
@@ -260,7 +260,7 @@ export const SMART_TEMPLATES_LIBRARY: SmartTemplateDefinition[] = [
     popularRank: 3,
     governingLaw: 'Fuqarolik kodeksi 134-144 moddalar (Vakillik va ishonchnoma); FPK 66-modda; IPK 61-modda',
     governingCodeName: 'O‘zR Fuqarolik Kodeksi (134-modda)',
-    lexUrl: 'https://lex.uz/docs/111189#150200',
+    lexUrl: 'https://lex.uz/docs/111189',
     standardClassification: 'O‘zDSt 1157:2008 / FK-134 / POA-LEGAL',
     summary: 'Yuridik shaxs nomidan to‘liq vakillik, sudlarda huquqlarni himoya qilish, bank, soliq va avtotransport vositalarini boshqarish bo‘yicha FK 134-144 moddalari talablariga mos rasmiy ishonchnoma (doverennost).',
     statutoryMandatoryClauses: [
@@ -279,7 +279,7 @@ export const SMART_TEMPLATES_LIBRARY: SmartTemplateDefinition[] = [
         badge: 'FK 134 Bosh Vakillik',
         description: 'Kompaniya nomidan davlat organlarida, soliq, bojxona, tijorat banklarida hujjatlarni imzolash, topshirish va shartnomalar tuzish vakolati.',
         statutoryBasis: 'Fuqarolik kodeksi 134, 138, 139-moddalar (Yuridik shaxs nomidan ishonchnoma)',
-        lexUrl: 'https://lex.uz/docs/111189#150200',
+        lexUrl: 'https://lex.uz/docs/111189',
         keyLegalGuarantees: [
           'FK 139-moddasi bo‘yicha maksimal 3 yillik qonuniy muddat',
           'Sana majburiyligi kafolati (FK 139: sanasiz ishonchnoma o‘z-o‘zidan haqiqiy emas)',
@@ -301,7 +301,7 @@ export const SMART_TEMPLATES_LIBRARY: SmartTemplateDefinition[] = [
         badge: 'FPK 66 / IPK 61 Sud',
         description: 'Fuqarolik, iqtisodiy va ma‘muriy sudlarda ishtirok etish: da‘vo imzolash, dalillar taqdim etish, kelishuv bitimi tuzish va apellyatsiya berish.',
         statutoryBasis: 'Fuqarolik protsessual kodeksi 66, 67, 69-moddalar; Iqtisodiy protsessual kodeksi 61, 63-moddalar',
-        lexUrl: 'https://lex.uz/docs/3517337#3518200',
+        lexUrl: 'https://lex.uz/docs/3517337',
         keyLegalGuarantees: [
           'Sudda da‘vo arizasini imzolash va da‘voni to‘liq yoki qisman rad etish vakolati (FPK 69)',
           'Kelishuv bitimi imzolash va ijro varaqasini undirishga topshirish huquqi',
@@ -322,7 +322,7 @@ export const SMART_TEMPLATES_LIBRARY: SmartTemplateDefinition[] = [
         badge: 'FK 135 Avtotransport',
         description: 'Avtomobilni O‘zbekiston bo‘ylab boshqarish, texnik ko‘rikdan o‘tkazish, sug‘urta shartnomalarini tuzish va jarimalarni to‘lash huquqi.',
         statutoryBasis: 'Fuqarolik kodeksi 134, 135, 137, 139-moddalar; Yo‘l harakati qoidalari',
-        lexUrl: 'https://lex.uz/docs/111189#150200',
+        lexUrl: 'https://lex.uz/docs/111189',
         keyLegalGuarantees: [
           'Yo‘l harakati xavfsizligi xizmati (YHXX) va YHQ talablariga moslik',
           'Maksimal 3 yillik qonuniy amal qilish muddati',
@@ -352,7 +352,7 @@ export const SMART_TEMPLATES_LIBRARY: SmartTemplateDefinition[] = [
     popularRank: 4,
     governingLaw: 'Fuqarolik kodeksi 703-708 moddalar; Shartnomaviy-huquqiy baza to‘g‘risidagi Qonun',
     governingCodeName: 'O‘zR Fuqarolik Kodeksi (703-modda)',
-    lexUrl: 'https://lex.uz/docs/111189#162000',
+    lexUrl: 'https://lex.uz/docs/111189',
     standardClassification: 'O‘zDSt 1157:2008 / FK-703',
     summary: 'IT xizmatlari, konsalting, marketing, dizayn va dasturiy ta‘minot ishlab chiqish bo‘yicha topshirish-qabul qilish dalolatnomasi (Akt) va EHF bilan himoyalangan shartnoma.',
     statutoryMandatoryClauses: [
@@ -370,7 +370,7 @@ export const SMART_TEMPLATES_LIBRARY: SmartTemplateDefinition[] = [
         badge: 'FK 703 IT & Tech',
         description: 'Dasturiy ta‘minot yaratish, veb-sayt va ERP integratsiyasi: mualliflik huquqi o‘tishi, 30 kunlik kafolat va dalolatnoma.',
         statutoryBasis: 'Fuqarolik kodeksi 703, 704, 1031-moddalar (Mualliflik huquqi)',
-        lexUrl: 'https://lex.uz/docs/111189#162000',
+        lexUrl: 'https://lex.uz/docs/111189',
         keyLegalGuarantees: [
           'Barcha yaratilgan dastur kodi va intellektual mulk to‘liq Buyurtmachiga o‘tishi',
           'Xatoliklarni bepul bartaraf etish bo‘yicha 30 kunlik kafolat muddati',
@@ -399,7 +399,7 @@ export const SMART_TEMPLATES_LIBRARY: SmartTemplateDefinition[] = [
     popularRank: 5,
     governingLaw: 'Fuqarolik kodeksi 437-456 moddalar; Shartnomaviy-huquqiy baza to‘g‘risidagi Qonun (25-modda: penya chegarasi)',
     governingCodeName: 'O‘zR Fuqarolik Kodeksi (437-modda)',
-    lexUrl: 'https://lex.uz/docs/111189#158000',
+    lexUrl: 'https://lex.uz/docs/111189',
     standardClassification: 'O‘zDSt 1157:2008 / FK-437',
     summary: 'Xo‘jalik yurituvchi subyektlar o‘rtasida tovar va moddiy boyliklarni yetkazib berish: 15-30% avans, O‘zDSt sifat talabi va qonuniy 50%lik penya chegarasi bilan himoyalangan shartnoma.',
     statutoryMandatoryClauses: [
@@ -417,7 +417,7 @@ export const SMART_TEMPLATES_LIBRARY: SmartTemplateDefinition[] = [
         badge: 'FK 437 B2B Savdo',
         description: 'Tadbirkorlar o‘rtasida tovar yetkazish: 30% oldindan to‘lov, 10 kunlik yetkazish muddati va qat‘iy sifat standarti.',
         statutoryBasis: 'Fuqarolik kodeksi 437, 442, 444-moddalar; Qonun № 670-I',
-        lexUrl: 'https://lex.uz/docs/111189#158000',
+        lexUrl: 'https://lex.uz/docs/111189',
         keyLegalGuarantees: [
           'Sifatning O‘zDSt davlat standartiga to‘liq mos kelish majburiyati',
           'Kechiktirilgan to‘lov va mahsulot yetkazish uchun o‘zaro qonuniy penya',
@@ -448,7 +448,7 @@ export const SMART_TEMPLATES_LIBRARY: SmartTemplateDefinition[] = [
     popularRank: 6,
     governingLaw: 'Fuqarolik kodeksi 732-743 moddalar (Qarz shartnomasi shakli va qaytarish qoidalari)',
     governingCodeName: 'O‘zR Fuqarolik Kodeksi (732-modda)',
-    lexUrl: 'https://lex.uz/docs/111189#162500',
+    lexUrl: 'https://lex.uz/docs/111189',
     standardClassification: 'O‘zDSt 1157:2008 / FK-732-RECEIPT',
     summary: 'Fuqarolar o‘rtasida pul mablag‘larini qarzga berish va qabul qilib olish: tilxat kuchi, aniq qaytarish sanasi, kechiktirilgan kunga 0.1% penya va sud orqali undirish kafolati.',
     statutoryMandatoryClauses: [
@@ -466,7 +466,7 @@ export const SMART_TEMPLATES_LIBRARY: SmartTemplateDefinition[] = [
         badge: 'FK 732 Tilxat',
         description: 'Sudlarda asosiy yozma dalil bo‘ladigan qarz tilxati: qat‘iy qaytarish muddati, 0.1% penya va rekvizitlar.',
         statutoryBasis: 'Fuqarolik kodeksi 732, 733, 735, 736, 327-moddalar',
-        lexUrl: 'https://lex.uz/docs/111189#162500',
+        lexUrl: 'https://lex.uz/docs/111189',
         keyLegalGuarantees: [
           'FK 733-moddasi 2-qismiga ko‘ra qarz tilxatining yozma shartnoma kuchi',
           'Belgilangan muddat o‘tishi bilan FK 327 bo‘yicha foizlar hisoblash kafolati',
@@ -496,7 +496,7 @@ export const SMART_TEMPLATES_LIBRARY: SmartTemplateDefinition[] = [
     popularRank: 7,
     governingLaw: 'Fuqarolik protsessual kodeksi 189, 190, 191-moddalar; FK 732, 735, 327-moddalar',
     governingCodeName: 'O‘zR Fuqarolik Protsessual Kodeksi',
-    lexUrl: 'https://lex.uz/docs/3517337#3519800',
+    lexUrl: 'https://lex.uz/docs/3517337',
     standardClassification: 'O‘zDSt 1157:2008 / FPK-189',
     summary: 'Fuqarolik ishlari bo‘yicha tumanlararo sudiga kiritiladigan rasmiy da‘vo arizasi: qarz summasi, FK 327 bo‘yicha foizlar, 4% davlat boji va ilovalar to‘liq hisoblangan.',
     statutoryMandatoryClauses: [
@@ -514,7 +514,7 @@ export const SMART_TEMPLATES_LIBRARY: SmartTemplateDefinition[] = [
         badge: 'FPK 189 Sud da‘vosi',
         description: 'Fuqarolik sudiga qarz va foizlarni undirish da‘vosi: 4% davlat boji va pochta xarajatlarini javobgardan undirish talabi.',
         statutoryBasis: 'FPK 189, 190, 191-moddalar; FK 732, 735, 327-moddalar',
-        lexUrl: 'https://lex.uz/docs/3517337#3519800',
+        lexUrl: 'https://lex.uz/docs/3517337',
         keyLegalGuarantees: [
           'Da‘vo arizasini harakatdan qoldirish xavfisiz FPK 189 qoidalariga 100% mos tuzilishi',
           'Davlat boji va barcha sud xarajatlarini javobgardan undirib berish talabi',

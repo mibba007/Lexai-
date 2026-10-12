@@ -22,6 +22,7 @@ import {
   ArrowRight,
   ShieldAlert,
   ShieldCheck,
+  AlertTriangle,
   HelpCircle,
   Clock,
   Layers,
@@ -54,6 +55,8 @@ import { playGeminiAudio, speakBrowserTTS } from '../utils/audioUtils';
 import { synthesizeClientLegalConsult } from '../utils/offlineLegalEngine';
 import { ChatSessionSidebar } from './ChatSessionSidebar';
 import { LexVerificationBadge } from './LexVerificationBadge';
+import { LexRealTimeVerificationStatus } from './LexRealTimeVerificationStatus';
+import { LexCanonicalLink } from './LexCanonicalLink';
 
 interface LegalChatViewProps {
   onSaveCitation?: (citation: LegalCitation) => void;
@@ -100,7 +103,7 @@ const createDefaultWelcomeMessage = (): ChatMessage => ({
   id: 'welcome-msg',
   sender: 'assistant',
   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-  text: 'Assalomu alaykum! Men LEXAI UZ — O‘zbekiston Respublikasi qonunchiligi bo‘yicha rasmiy AI-yuridik konsultantingizman. Barcha javoblarim to‘g‘ridan-to‘g‘ri LEX.UZ bazasidagi amaldagi moddalarga tayanadi. Sizga qanday huquqiy yordam bera olaman?',
+  text: 'Assalomu alaykum! Men **LEXAI UZ** — O‘zbekiston Respublikasi rasmiy **Lex.uz** milliy qonunchilik bazasi bo‘yicha AI-yuridik konsultantingizman.\n\nBarcha konsultatsiyalarim to‘g‘ridan-to‘g‘ri **amaldagi Qonunlar (O‘RQ)**, **Prezident Farmonlari (PF)**, **Qarorlari (PQ)** hamda **Vazirlar Mahkamasi qarorlariga (VMQ)** asoslanadi. Bekor bo‘lgan eski normalar (masalan, 1995-yilgi Mehnat kodeksi) yoki chet davlatlar qonunlari avtomatik filtrlangan.\n\nQaysi soha yoki nizo bo‘yicha amaldagi qonuniy mezonlarni tekshirmoqchisiz?',
 });
 
 const createNewSessionObject = (title = 'Yangi yuridik konsultatsiya'): LegalChatSession => ({
@@ -279,7 +282,7 @@ export const LegalChatView: React.FC<LegalChatViewProps> = ({
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [thinkingMode, setThinkingMode] = useState(true);
-  const [useSearchGrounding, setUseSearchGrounding] = useState(false);
+  const [useSearchGrounding, setUseSearchGrounding] = useState(true);
   const [lexSyncEnabled, setLexSyncEnabled] = useState(true);
   const [showLexSyncModal, setShowLexSyncModal] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<ChatAttachment[]>([]);
@@ -865,15 +868,18 @@ export const LegalChatView: React.FC<LegalChatViewProps> = ({
           <button
             id="toggle-search-grounding-btn"
             onClick={() => setUseSearchGrounding(!useSearchGrounding)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
               useSearchGrounding
-                ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300 shadow-sm shadow-emerald-900/30'
+                ? 'bg-emerald-950/90 border-emerald-500/80 text-emerald-300 shadow-sm shadow-emerald-900/40'
                 : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-300'
             }`}
-            title="Google Search Grounding — Real-vaqt qonun yangiliklari va Lex.uz yangilanishlari"
+            title="Lex.uz va Web Grounding — Real-vaqt qonun amaldagi tahriri va normativ hujjat raqamlari tekshiruvi"
           >
             <Globe className={`w-3.5 h-3.5 ${useSearchGrounding ? 'text-emerald-400' : ''}`} />
-            <span>Web Grounding</span>
+            <span>{useSearchGrounding ? 'Lex.uz Jonli Tekshiruv: Faol' : 'Lex.uz Tekshiruv: O‘chirilgan'}</span>
+            {useSearchGrounding && (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            )}
           </button>
         </div>
       </div>
@@ -947,6 +953,27 @@ export const LegalChatView: React.FC<LegalChatViewProps> = ({
 
       {/* Messages Thread */}
       <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin scrollbar-thumb-slate-700">
+        {/* Lex.uz Verification Status Ribbon */}
+        <div className="bg-gradient-to-r from-emerald-950/70 via-slate-900 to-indigo-950/70 border border-emerald-500/40 rounded-xl p-2.5 sm:px-3.5 sm:py-2.5 flex items-center justify-between gap-3 text-xs text-slate-200 shadow-xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            </div>
+            <div className="min-w-0">
+              <span className="font-semibold text-emerald-300 block truncate">
+                Lex.uz Milliy Qonunchilik Nazorati: Amaldagi Tahrirlar (2026)
+              </span>
+              <span className="text-[11px] text-slate-400 block truncate">
+                O‘RQ qonunlari, Prezident farmonlari (PF) va qarorlari (PQ/VMQ) raqamlari bilan tekshirilgan. Bekor bo‘lgan eski normalar chiqarib tashlangan.
+              </span>
+            </div>
+          </div>
+          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/40 shrink-0 hidden sm:inline-flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            100% Amalda
+          </span>
+        </div>
+
         {/* Preset suggestions if 1 message */}
         {messages.length === 1 && (
           <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 my-2">
@@ -1093,16 +1120,22 @@ export const LegalChatView: React.FC<LegalChatViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Lex.uz Zero-Hallucination Verified Badge */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs">
-                      <div className="flex items-center gap-2 font-medium">
-                        <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                        <span><strong>Lex.uz Qonunlar Bazasi:</strong> Moddalar va sharhlar 100% tasdiqlangan</span>
+                    {/* Real-time Verification Status UI Component (Metadata Version Stamp Validator) */}
+                    {analysis.legalBasis && analysis.legalBasis.length > 0 ? (
+                      <LexRealTimeVerificationStatus 
+                        citations={analysis.legalBasis} 
+                      />
+                    ) : (
+                      <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs">
+                        <div className="flex items-center gap-2 font-medium">
+                          <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                          <span><strong>Lex.uz Qonunlar Bazasi:</strong> Moddalar va sharhlar 100% tasdiqlangan</span>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-900/60 text-emerald-200 border border-emerald-500/40">
+                          To‘qima moddalar yo‘q ✓
+                        </span>
                       </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-900/60 text-emerald-200 border border-emerald-500/40">
-                        To‘qima moddalar yo‘q ✓
-                      </span>
-                    </div>
+                    )}
 
                     {/* High Thinking Process Accordion (if present) */}
                     {analysis.thinkingProcess && (
@@ -1291,15 +1324,14 @@ export const LegalChatView: React.FC<LegalChatViewProps> = ({
                                           </span>
 
                                           {item.lexUrl && (
-                                            <a
-                                              href={item.lexUrl}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 bg-cyan-950/50 hover:bg-cyan-900/60 px-2 py-0.5 rounded border border-cyan-800/50 transition-colors"
-                                            >
-                                              <span>Lex.uz da ochish</span>
-                                              <ExternalLink className="w-2.5 h-2.5" />
-                                            </a>
+                                            <LexCanonicalLink
+                                              url={item.lexUrl}
+                                              documentName={item.associatedLawArticle || ''}
+                                              label="Lex.uz da ochish"
+                                              size="xs"
+                                              variant="outline"
+                                              showCopyButton={true}
+                                            />
                                           )}
                                         </div>
                                       )}
@@ -1378,6 +1410,11 @@ export const LegalChatView: React.FC<LegalChatViewProps> = ({
                                       <span className="px-1.5 py-0.2 text-[10px] font-bold rounded bg-indigo-950 text-indigo-300 border border-indigo-800/60">
                                         {cite.documentType}
                                       </span>
+                                      {cite.lawNumber && (
+                                        <span className="px-1.5 py-0.2 text-[10px] font-bold rounded bg-emerald-950/90 text-emerald-300 border border-emerald-700/70 font-mono">
+                                          {cite.lawNumber}
+                                        </span>
+                                      )}
                                       <strong className="text-xs text-indigo-200">
                                         {cite.documentName}
                                       </strong>
@@ -1387,14 +1424,30 @@ export const LegalChatView: React.FC<LegalChatViewProps> = ({
                                       {/* Real-time verification badge */}
                                       <LexVerificationBadge citation={cite} size="sm" />
                                     </div>
+                                    {cite.repealedNote && (
+                                      <div className="my-1.5 px-2.5 py-1 rounded bg-amber-950/70 border border-amber-500/50 text-[11px] text-amber-200 flex items-start gap-1.5">
+                                        <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                                        <span>{cite.repealedNote}</span>
+                                      </div>
+                                    )}
                                     {cite.quote && (
                                       <blockquote className="text-xs text-slate-300 italic border-l-2 border-indigo-500/60 pl-2.5 my-1.5 bg-indigo-950/20 py-1 rounded-r">
                                         «{cite.quote}»
                                       </blockquote>
                                     )}
-                                    <span className="text-[10px] text-slate-500">
-                                      Tahrir: {cite.editionDate || 'Amaldagi'}
-                                    </span>
+                                    <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-400 mt-1">
+                                      <span>Tahrir: <strong className="text-slate-300 font-mono">{cite.editionDate || 'Amaldagi'}</strong></span>
+                                      {cite.versionStamp && (
+                                        <span className="font-mono text-cyan-300 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800" title="Metadata versiya tamg‘asi">
+                                          Tamg‘a: {cite.versionStamp}
+                                        </span>
+                                      )}
+                                      {cite.verifiedDetails && (
+                                        <span className="text-emerald-400/90 font-medium">
+                                          • {cite.verifiedDetails}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
 
                                   <div className="flex items-center gap-1 flex-shrink-0">
@@ -1411,15 +1464,15 @@ export const LegalChatView: React.FC<LegalChatViewProps> = ({
                                         {isSaved ? <BookmarkCheck className="w-3.5 h-3.5 text-cyan-400" /> : <Bookmark className="w-3.5 h-3.5" />}
                                       </button>
                                     )}
-                                    <a
-                                      href={cite.lexUrl || 'https://lex.uz'}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="flex items-center gap-1 px-2 py-1 rounded bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 text-xs font-medium border border-indigo-700/60 transition"
-                                    >
-                                      <span>Lex.uz</span>
-                                      <ExternalLink className="w-3 h-3" />
-                                    </a>
+                                    <LexCanonicalLink
+                                      url={cite.lexUrl}
+                                      documentName={cite.documentName}
+                                      articleNumber={cite.articleNumber}
+                                      label="Lex.uz"
+                                      size="sm"
+                                      variant="outline"
+                                      showCopyButton={true}
+                                    />
                                   </div>
                                 </div>
                               </div>

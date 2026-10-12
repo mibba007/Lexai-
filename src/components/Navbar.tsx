@@ -14,7 +14,8 @@ import {
   FileAudio,
   Wifi,
   WifiOff,
-  User
+  User,
+  Activity
 } from 'lucide-react';
 import { OFFICIAL_MACRO_DATA } from '../data/lawsDatabase';
 import { LanguageMode, NavigationTab } from '../types';
@@ -46,6 +47,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'contract', label: 'Shartnomalar Auditi', icon: ShieldCheck, badge: 'AI Risk' },
     { id: 'generator', label: 'Hujjatlar Generatori', icon: FileText },
     { id: 'calculators', label: 'Yuridik Kalkulyator', icon: Calculator },
+    { id: 'audit', label: 'Qonunchilik Nazorati', icon: Activity, badge: 'Rasmiy Audit' },
     { id: 'cabinet', label: 'Mening Kabinetim', icon: FolderLock, count: savedCount },
     { id: 'profile', label: 'Mening Profilim', icon: User, badge: 'Rekvizitlar' },
   ];
@@ -62,13 +64,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="font-semibold">OFLAYN REJIM: LOKAL BAZA &amp; PDF GENERATOR FAOLLASHTIRILGAN</span>
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 text-emerald-400 font-medium">
+              <button
+                type="button"
+                onClick={() => onTabChange('audit')}
+                className="flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 font-medium cursor-pointer transition"
+                title="Qonunchilik nazorati va audit paneliga o‘tish"
+              >
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                <span>LEX.UZ RASMIY BAZASI: 100% SINXRONLASHTIRILGAN</span>
-              </div>
+                <span>LEX.UZ RASMIY BAZASI: AMALDAGI TAHRIR (2026-YIL KUCHDA)</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 ml-1">Audit</span>
+              </button>
             )}
             
             {onToggleOfflineMode && (

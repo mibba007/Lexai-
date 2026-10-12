@@ -26,6 +26,7 @@ import {
   Volume2
 } from 'lucide-react';
 import { AudioForensicReport, AudioForensicMetadata, AudioSentenceAnalysis } from '../types';
+import { LexCanonicalLink } from './LexCanonicalLink';
 
 interface AudioForensicProps {
   onNavigateToDocumentGenerator?: (initialDoc: {
@@ -69,7 +70,7 @@ const SAMPLE_CASES: Array<{
         legalMeaning: 'Majburiyatni lozim darajada bajarish to‘g‘risidagi qonuniy talab. Kreditor tomonidan ijro muddati o‘tganligi rasman bildirilmoqda (FK 236, 242-moddalar).',
         associatedLawArticle: 'O‘zR Fuqarolik kodeksi 236, 242-moddalar',
         legalRiskOrEvidentiaryWeight: 'IMPORTANT',
-        lexUrl: 'https://lex.uz/docs/111189#151750',
+        lexUrl: 'https://lex.uz/docs/111189',
       },
       {
         sentenceNumber: 2,
@@ -79,7 +80,7 @@ const SAMPLE_CASES: Array<{
         legalMeaning: 'QARZ VA MAJBURIYATNI OG‘ZAKI SO‘ZSIZ TAN OLISH (FK 732-modda). Ushbu iqror sud uchun hal qiluvchi dalil bo‘lib, FK 157-moddasi 1-qismiga binoan umumiy 3 yillik da‘vo muddatining o‘tishini to‘xtatib, yangidan boshlaydi.',
         associatedLawArticle: 'O‘zR Fuqarolik kodeksi 157-modda (Da‘vo muddati o‘tishining uzilishi)',
         legalRiskOrEvidentiaryWeight: 'CRITICAL',
-        lexUrl: 'https://lex.uz/docs/111189#150912',
+        lexUrl: 'https://lex.uz/docs/111189',
       },
       {
         sentenceNumber: 3,
@@ -155,7 +156,7 @@ const SAMPLE_CASES: Array<{
         legalMeaning: 'MEHNAT MUNOSABATLARIDA MAJBURLASH VA NOQONUNIY TAZYIQ (MK 5-modda). Mehnat kodeksining 160-moddasiga ko‘ra xodimning tashabbusi faqat ixtiyoriy bo‘lishi shart. Majburlab yozdirilgan ariza g‘ayriqonuniy hisoblanadi.',
         associatedLawArticle: 'O‘zR Mehnat kodeksi 5, 160-moddalar',
         legalRiskOrEvidentiaryWeight: 'CRITICAL',
-        lexUrl: 'https://lex.uz/docs/6257288#6258840',
+        lexUrl: 'https://lex.uz/docs/6257288',
       },
       {
         sentenceNumber: 2,
@@ -175,7 +176,7 @@ const SAMPLE_CASES: Array<{
         legalMeaning: 'Mansab vakolatini suiiste‘mol qilish, soxta intizomiy jazo bilan qo‘rqitish (MJtK 49-moddasi bo‘yicha mehnat qonunchiligini buzish). Xodim sudga murojaat qilganda ishga tiklanish va majburiy progul haqini undirish kafolatlangan.',
         associatedLawArticle: 'O‘zR Mehnat kodeksi 161, 163-moddalar, MJtK 49-modda',
         legalRiskOrEvidentiaryWeight: 'CRITICAL',
-        lexUrl: 'https://lex.uz/docs/6257288#6258900',
+        lexUrl: 'https://lex.uz/docs/6257288',
       },
     ],
     report: {
@@ -947,15 +948,14 @@ export const AudioForensic: React.FC<AudioForensicProps> = ({ onNavigateToDocume
                           </div>
 
                           {item.lexUrl && (
-                            <a
-                              href={item.lexUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-400 hover:text-cyan-300 bg-cyan-950/60 hover:bg-cyan-900/70 px-2.5 py-1 rounded border border-cyan-800/60 transition-colors"
-                            >
-                              <span>Lex.uz da ochish</span>
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
+                            <LexCanonicalLink
+                              url={item.lexUrl}
+                              documentName={item.associatedLawArticle || ''}
+                              label="Lex.uz da ochish"
+                              size="sm"
+                              variant="outline"
+                              showCopyButton={true}
+                            />
                           )}
                         </div>
                       )}

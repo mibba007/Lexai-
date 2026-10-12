@@ -4,6 +4,14 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, ThinkingLevel, Modality, Type } from '@google/genai';
 import dotenv from 'dotenv';
 import mammoth from 'mammoth';
+import { UZBEKISTAN_LAWS_DATABASE, searchLawsDatabase, OFFICIAL_MACRO_DATA, verifyCitationWithLexDb, OBSOLETE_LAW_MAPPINGS } from './src/data/lawsDatabase';
+import { compareMetadataVersionStamps, auditAllMessageCitations } from './src/utils/versionStampUtils';
+import { sanitizeLexUrl } from './src/utils/lexUrlSanitizer';
+import { validateCitation } from './src/services/legal/CitationValidator';
+import { getBhmForDate, getMhtekmForDate } from './src/services/legal/MacroValuesService';
+import { legalIngestionService } from './src/services/legal/LegalIngestionService';
+import { LegalCacheManager } from './src/services/legal/CacheManager';
+import { runFullRepositoryLegalAudit } from './src/services/legal/LegalAuditService';
 
 dotenv.config();
 
@@ -34,77 +42,81 @@ function getGenAI(): GoogleGenAI {
   return genAIClient;
 }
 
-// Resilient wrapper that attempts primary model and falls back to flash-lite on quota limits / errors
+// Resilient wrapper that attempts primary model and falls back through stable available models
 async function callGeminiSafe(
   ai: GoogleGenAI,
   primaryModel: string,
   fallbackModel: string,
   params: any
 ) {
-  try {
-    return await ai.models.generateContent({
-      ...params,
-      model: primaryModel,
-    });
-  } catch (err: any) {
-    const errMsg = err?.message || String(err);
-    console.warn(`[Gemini Safe Dispatch] ${primaryModel} failed (${errMsg.slice(0, 150)}...), retrying with ${fallbackModel}`);
-    return await ai.models.generateContent({
-      ...params,
-      model: fallbackModel,
-    });
+  const models = [primaryModel, fallbackModel, 'gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.8-flash'];
+  const uniqueModels = Array.from(new Set(models));
+
+  for (let i = 0; i < uniqueModels.length; i++) {
+    const m = uniqueModels[i];
+    try {
+      return await ai.models.generateContent({
+        ...params,
+        model: m,
+      });
+    } catch (err: any) {
+      const errMsg = err?.message || String(err);
+      console.warn(`[Gemini Safe Dispatch] ${m} status: ${errMsg.slice(0, 120)}... trying next model in queue...`);
+      if (i === uniqueModels.length - 1) {
+        throw err;
+      }
+    }
   }
 }
 
 const SYSTEM_LEGAL_INSTRUCTION = `Siz "LEXAI UZ" — O‘zbekiston Respublikasi qonunchiligi (Lex.uz) bo‘yicha yuqori malakali AI yuridik konsultanti, RAG arxitektori va LegalTech tizimisiz.
 
-SIZNING QAT‘IY VA MUTLAQ QOIDALARINGIZ (LEX.UZ HAQIQIYILIK PROTOKOLI):
-1. QAT‘IY QOIDA: Siz o‘zingizdan qonun, modda yoki sharh to‘qimaysiz! Faqat O‘zbekiston Respublikasi rasmiy qonunchiligi (Lex.uz bazasi)dagi asl moddalarga asoslanasiz.
-2. MODDALAR VA MATNLARNI ARALASHTIRISH (HALLUCINATION) QAT‘IYAN TAQIQLANADI:
-   - Hech qachon bitta moddaning sharhini yoki matnini boshqa modda raqamiga yozmang!
-   - Masalan:
-     * O‘zbekiston Respublikasi Fuqarolik kodeksining 100-MODDASI: «Sha’n, qadr-qimmat va ishchanlik obro‘sini himoya qilish».
-       - 1-qism: Fuqaro o‘zining sha’niga, qadr-qimmatiga yoki ishchanlik obro‘siga putur yetkazuvchi ma’lumotlar yuzasidan sud yo‘li bilan raddiya talab qilishga haqli.
-       - 6-qism: Ushbu moddaning fuqaroning ishchanlik obro‘sini himoya qilishga doir qoidalari tegishincha yuridik shaxsning ishchanlik obro‘sini himoya qilishga nisbatan ham qo‘llanadi. Yuridik shaxsning ishchanlik obro‘siga putur yetkazadigan ma’lumotlar tarqatilgan taqdirda, ushbu shaxs bunday ma’lumotlarni raddiya qilish bilan bir qatorda, ularni tarqatish natijasida yetkazilgan zararning o‘rnini qoplashni talab qilishga haqlidir.
-     * O‘zbekiston Respublikasi Fuqarolik kodeksining 1021-MODDASI: «Ma’naviy zararni qoplashning umumiy asoslari» (ayb bo‘lganda, shuningdek manba xavfi va qonunda belgilangan hollarda aybsiz ham qoplanadi).
-     * O‘zbekiston Respublikasi Fuqarolik kodeksining 1022-MODDASI: «Ma’naviy zararni qoplash usuli va miqdori».
-       - 1-qism: Ma’naviy zarar pul bilan qoplanadi.
-       - 2-qism: Ma’naviy zararni qoplash miqdori jabrlanuvchiga yetkazilgan jismoniy va ma’naviy azoblarning xususiyatiga, shuningdek zarar yetkazuvchining aybi darajasiga qarab sud tomonidan belgilanadi.
-     * O‘zbekiston Respublikasi Fuqarolik kodeksining 14-MODDASI: «Zararni qoplash» (real zarar va boy berilgan foyda).
-     * O‘zbekiston Respublikasi Fuqarolik kodeksining 985-MODDASI: «Zarar yetkazganlik uchun javobgarlikning umumiy asoslari».
-     * O‘zbekiston Respublikasi Mehnat kodeksi (yangi tahrir): 161-modda (ish beruvchi tashabbusi bilan bekor qilish asoslari), 312-modda (intizomiy jazolar).
-3. Har bir xulosa va tavsiya quyidagi aniqlikda asoslanishi shart:
-   - Hujjat nomi (Masalan: O‘zbekiston Respublikasining Fuqarolik kodeksi)
-   - Bob va bo‘lim
-   - Aniq modda raqami (Masalan: 100-modda)
-   - Qism va bandi (Masalan: 6-qism)
-   - Asl norma matni (Lex.uz dagi asl matn)
-   - Rasmiy Lex.uz havolasi (Masalan: https://lex.uz/docs/111189)
-4. Agar savol bo‘yicha qonunda aniq norma mavjud bo‘lmasa yoki ma‘lumot yetarli bo‘lmasa:
-   "Ushbu savol bo‘yicha ishonchli huquqiy norma topilmadi" yoki aniqlashtiruvchi savollarni bering. Hech qachon taxmin qilmang.
+SIZNING QAT‘IY VA MUTLAQ QOIDALARINGIZ (LEX.UZ RASMIY AMALDAGI QONUNCHILIK PROTOKOLI):
+1. QAT‘IY TALAB (NO-HALLUCINATION & LEX.UZ AMALDAGI TAHRIRI):
+   - Siz o‘zingizdan qonun, modda raqami yoki qaror to‘qimaysiz!
+   - Faqat va faqat O‘zbekiston Respublikasi rasmiy Lex.uz bazasidagi amaldagi qonunlar, kodekslar, Prezident farmonlari va qarorlari, Vazirlar Mahkamasi qarorlariga tayanasiz.
+   - Har bir norma yonida uning rasmiy raqami va sanasi (masalan, O‘RQ-798-son, PF-5624, VMQ-837, FK-111189) ko‘rsatilishi SHART.
 
-5. AUDIO VA OVOZLI YOZUVLARNI CHUQUR TAHLIL QILISH (QAT‘IY TALAB):
-   - Agar audio yozuv ilova qilingan bo‘lsa, siz Sud-fonotexnika va Audio dalillar ekspertisiz.
-   - DIQQAT: Hech qachon boshqa begona mavzularga (masalan, audioda gapirilmagan mehnat yoki aliment masalalariga) asossiz o‘tib ketmang! Faqat va faqat audiodagi haqiqiy so‘zlashuvni tahlil qiling.
-   - Audioda aytilgan HAR BIR GAPNI ajratib, "sentenceBreakdown" ro‘yxatiga kiriting:
-     * sentenceNumber: tartib raqami
-     * speaker: 1-so‘zlovchi, 2-so‘zlovchi va h.k.
-     * timestamp: daqiqa va soniya (masalan: "00:04 - 00:11")
-     * exactStatement: audioda aytilgan aniq gap/iqtibos
-     * legalMeaning: gapning huquqiy oqibati (qarzni tan olish, va‘da, kelishuv, da‘vo, tahdid va h.k.)
-     * associatedLawArticle: O‘zR tegishli qonun moddasi (masalan: FK 732, FK 157, FPK 78, JK 165 va h.k.)
-     * legalRiskOrEvidentiaryWeight: "CRITICAL" | "IMPORTANT" | "NEUTRAL"
-     * lexUrl: rasmiy Lex.uz havolasi
-   - transcriptOrExtractedText ga audiodagi to‘liq stenogrammani yozing.
-   - evidentiaryValue ga O‘zR FPK 67, 78-moddalari yoki IPK 66-moddasi bo‘yicha sudda qabul qilinish shartlarini ko‘rsating.
+2. KUCHINI YO‘QOTGAN (BEKOR BO‘LGAN) HUJJATLAR BILAN ISHLASH MUTLAQO TAQIQLANADI:
+   - DIQQAT: Faqat va faqat O‘zbekiston Respublikasining 2026-yil holatiga ko‘ra amaldagi (CURRENT) qonunlari, kodekslari va tahrirlaridan foydalanilsin!
+   - Kuchini yo‘qotgan, bekor qilingan yoki eskirgan hujjatlar bilan ishlash QAT‘IYAN MAN ETILADI.
+   - 1995-YILGI ESKI MEHNAT KODEKSI MUTLAQO BEKOR BO‘LGAN!
+     O‘zbekistonda 2023-yil 30-apreldan boshlab yangi tahrirdagi Mehnat kodeksi (2022-yil 28-oktabrdagi O‘RQ-798-son Qonun, Lex.uz: https://lex.uz/docs/6257288) to‘liq amalda:
+     * Har yilgi asosiy eng kam mehnat ta‘tili: 21 kalendar kun (eski 15 ish kuni EMAS! 217-modda).
+     * Ish beruvchi tashabbusi bilan shartnomani bekor qilish: 161-modda (eski 100-modda EMAS!).
+     * Bekor qilish haqida ogohlantirish muddatlari: 162-modda (shtat qisqarganda 2 oy, malakada 2 hafta, majburiyat buzilishida 3 kun).
+     * Ishdan bo‘shatish nafaqasi (stajga qarab 50% dan 200% gacha): 173-modda.
+     * Dastlabki sinov muddati: 129-modda (oddiy xodimlar 3 oy, rahbarlar/buxgalterlar 6 oy).
+     * Intizomiy jazolar: 312-modda (faqat hayfsan, 30% gacha jarima, ishdan bo‘shatish).
+     * Homilador ayollar va 3 yoshgacha bolasi bor ayollar kafolatlari: 408-modda (ish beruvchi tashabbusi bilan bo‘shatish taqiqlanadi).
+   - Eski Soliq kodeksi (2020-yilgacha bo‘lgan tahrirlar, YaST) bekor qilingan! Yangi Soliq kodeksi (O‘RQ-599-son, 30.12.2019, Lex.uz: https://lex.uz/docs/4674902) bilan «Aylanmadan olinadigan soliq» (461, 467-moddalar, 4%) va JShODS (366-modda, 12%) amalda.
+   - Eski 1992-yilgi Konstitutsiya o‘rniga 2023-yil 30-aprelda umumxalq ovoz berish bilan qabul qilingan Yangi Tahrirdagi Konstitutsiya (Lex.uz: https://lex.uz/docs/6445145) amalda.
+
+3. BOSHQA DAVLATLAR QONUNCHILIGINI ARALASHTIRISH MUTLAQO TAQIQLANADI:
+   - Rossiya Federatsiyasi (RF TK, RF GK, RF KoAP), Qozog‘iston yoki boshqa xorijiy davlatlar qonunlarini O‘zbekiston normasi sifatida ko‘rsatish QAT‘IYAN TAQIQLANADI!
+   - Faqat va faqat O‘zbekiston Respublikasi Oliy Majlisi qabul qilgan O‘zbekiston qonunlari va Lex.uz dagi moddalar tahlil qilinadi.
+
+4. HAR BIR HUQUQIY ASOSNING ANIK STRUKTURASI VA KANONIK LEX.UZ HAVOLASI:
+   Har bir xulosa va havola quyidagi aniqlikda asoslanishi shart:
+   - Hujjatning rasmiy nomi (Masalan: O‘zbekiston Respublikasining Mehnat kodeksi)
+   - Qabul qilingan qonun/qaror raqami (Masalan: O‘RQ-798-son yoki PF-5624)
+   - Aniq modda raqami (Masalan: 161-modda)
+   - Qism va bandi (Masalan: 2-qism, 4-band)
+   - Asl norma matnidan aniq iqtibos (Lex.uz dagi haqiqiy matn)
+   - Rasmiy kanonik Lex.uz havolasi: Faqat "https://lex.uz/docs/{docId}" kanonik HTTPS formatida (masalan: https://lex.uz/docs/6257288, https://lex.uz/docs/111189, https://lex.uz/docs/4674902).
+   - Amaldagi holati: Faqat "CURRENT" (Amaldagi tahrir: 2026-yil)
+   - Agar foydalanuvchi eski normani so‘ragan bo‘lsa ham, uning bekor bo‘lganini qayd etib, faqat amaldagi yangi modda qo‘llanilsin (repealedNote).
+
+5. AUDIO VA HUJJATLARNI TAHLIL QILISH PROTOKOLI:
+   - Audio yozuv bo‘lsa: Sud-fonotexnika ekspertizasi talablariga rioya qiling. Audiodagi HAR BIR GAPNI ajratib, 'attachedMediaAudit.sentenceBreakdown' ga joylang. O‘zR FPK 67, 78-moddalari bo‘yicha sudda dalil bo‘lish shartlarini bayon qiling. Begona mavzularga asossiz o‘tib ketmang.
 
 Javobni doimo quyidagi JSON formatida qaytaring:
 {
-  "summaryAnswer": "Qisqa va aniq yuridik xulosa",
+  "summaryAnswer": "Qisqa va aniq yuridik xulosa (aniq O‘RQ yoki qonun raqamlari bilan)",
   "attachedMediaAudit": {
     "mediaType": "document | audio | image",
     "fileName": "Fayl nomi",
-    "transcriptOrExtractedText": "Audio yozuvning to‘liq stenogrammasi yoki hujjatdan olingan matn...",
+    "transcriptOrExtractedText": "Audio stenogrammasi yoki hujjat matni...",
     "speakersIdentified": ["1-so‘zlovchi", "2-so‘zlovchi"],
     "audioDurationEstimate": "Taxminiy davomiylik",
     "sentenceBreakdown": [
@@ -123,7 +135,7 @@ Javobni doimo quyidagi JSON formatida qaytaring:
       "Aniqlangan 1-fakt...",
       "Aniqlangan 2-fakt..."
     ],
-    "evidentiaryValue": "Ushbu hujjat yoki audio yozuvning O‘zR FPK 67-68, 78-moddalari yoki IPK 66, 75-moddalari bo‘yicha sudda maqbul yozma/audio dalil sifatida o‘tish darajasi va talablari",
+    "evidentiaryValue": "Ushbu hujjat yoki audio yozuvning O‘zR FPK 67-68, 78-moddalari bo‘yicha sudda maqbul yozma/audio dalil sifatida o‘tish darajasi va talablari",
     "audioEvidenceLegalityRules": [
       "Qachon, kim tomonidan va qanday sharoitda olinganligi ko‘rsatilishi shart (FPK 78-modda).",
       "Suhbatdoshlardan birining roziligi va suhbat ishtirokchisi bo‘lishi dalil maqbulligini oshiradi.",
@@ -132,15 +144,19 @@ Javobni doimo quyidagi JSON formatida qaytaring:
   },
   "legalBasis": [
     {
-      "documentName": "Hujjatning to‘liq rasmiy nomi",
+      "documentName": "O‘zbekiston Respublikasining Mehnat kodeksi",
+      "lawNumber": "O‘RQ-798-son",
       "documentType": "Kodeks | Qonun | Prezident Farmoni | Prezident Qarori | Vazirlar Mahkamasi Qarori | Konstitutsiya | Boshqa",
-      "articleNumber": "100-modda",
-      "partNumber": "6-qism",
-      "paragraphNumber": "1-xatboshi",
-      "quote": "Qonun moddasidagi asl normaning qisqa matni",
-      "editionDate": "Amaldagi tahrir",
-      "lexUrl": "https://lex.uz/docs/111189",
-      "status": "CURRENT"
+      "articleNumber": "161-modda",
+      "partNumber": "2-qism",
+      "paragraphNumber": "4-band",
+      "quote": "Qonun moddasidagi asl amaldagi normaning matni",
+      "editionDate": "Amaldagi tahrir: 2026-yil",
+      "lexUrl": "https://lex.uz/docs/6257288#6258900",
+      "status": "CURRENT",
+      "isLexVerified": true,
+      "verifiedDetails": "Lex.uz milliy qonunchilik bazasida amaldagi tahrir",
+      "repealedNote": "Agar eski norma bo‘lsa tushuntirish"
     }
   ],
   "detailedAnalysis": "Batafsil yuridik tahlil va qonun sharhi",
@@ -159,17 +175,17 @@ Javobni doimo quyidagi JSON formatida qaytaring:
     "Agar holat noaniq bo‘lsa qo‘shimcha savollar..."
   ],
   "confidenceLevel": "HIGH | MEDIUM | LOW",
-  "editionStatus": "Amaldagi tahrir: 2026-yil holatiga ko‘ra",
+  "editionStatus": "Amaldagi tahrir: 2026-yil holatiga ko‘ra (Lex.uz)",
   "category": "labor | civil | tax | criminal | admin | family | business | it_ip | customs | court",
-  "thinkingProcess": "Huquqiy mantiq va moddalarni tanlash asoslari"
+  "thinkingProcess": "Huquqiy mantiq va Lex.uz moddalarini tanlash asoslari"
 }`;
 
-// Resilient Multi-Model Content Generator
+// Resilient Multi-Model Content Generator with intelligent fallback
 async function generateWithResilience(
   contents: any,
   baseConfig: any,
-  preferredModel: string = 'gemini-3.8-flash',
-  fallbackModels: string[] = ['gemini-flash-latest', 'gemini-3.1-flash-lite']
+  preferredModel: string = 'gemini-3.1-flash-lite',
+  fallbackModels: string[] = ['gemini-flash-latest', 'gemini-3.8-flash']
 ) {
   const ai = getGenAI();
   const modelQueue = Array.from(new Set([preferredModel, ...fallbackModels]));
@@ -190,8 +206,24 @@ async function generateWithResilience(
         return response;
       }
     } catch (err: any) {
-      // Graceful fallback logging without triggering system alert alarms
-      console.warn(`[LexAI Model Failover] Model ${model} status: ${err?.status || err?.message || 'Quota/ApiError'}. Trying next model in queue...`);
+      console.warn(`[LexAI Model Failover] Model ${model} status: ${err?.status || err?.message || 'Quota/ApiNotice'}.`);
+
+      // If tool grounding hit rate limit/quota, automatically retry without tools
+      if (baseConfig.tools) {
+        try {
+          const cleanConfig = { ...baseConfig };
+          delete cleanConfig.tools;
+          const retryRes = await ai.models.generateContent({
+            model,
+            contents,
+            config: cleanConfig,
+          });
+          if (retryRes && (retryRes.text || retryRes.candidates?.length)) {
+            return retryRes;
+          }
+        } catch (_) {}
+      }
+
       if (i === modelQueue.length - 1) {
         throw err; // All models exhausted
       }
@@ -292,10 +324,9 @@ app.post('/api/gemini/legal-consult', async (req, res) => {
       responseMimeType: 'application/json',
     };
 
-    let preferredModel = 'gemini-3.8-flash';
+    let preferredModel = 'gemini-3.1-flash-lite';
 
     if (useSearchGrounding) {
-      preferredModel = 'gemini-3.8-flash';
       config.tools = [{ googleSearch: {} }];
     }
 
@@ -398,7 +429,22 @@ app.post('/api/gemini/legal-consult', async (req, res) => {
       promptText += '\n';
     }
 
-    promptText += `Yangi savol/holat: ${message || 'Iltimos, ilova qilingan hujjat yoki audio yozuvni O‘zbekiston qonunchiligi (Lex.uz) bo‘yicha chuqur tahlil qilib, rasmiy yuridik xulosa bering.'}\n\nJavobni faqat O‘zbekiston qonunlariga (Lex.uz) tayangan holda belgilangan JSON formatda bering.`;
+    // High-precision Lex.uz RAG retrieval from authentic statutes database
+    const matchedArticles = searchLawsDatabase(userQuery);
+    let ragContext = '';
+    if (matchedArticles.length > 0) {
+      ragContext = `\n--- [O‘ZBEKISTON RESPUBLIKASI RASMIY AMALDAGI QONUNCHILIK BAZASI (LEX.UZ - 2026-YIL AMALDAGI TAHRIRI)] ---\n` +
+        `Sizga savol bo‘yicha O‘zbekiston Respublikasi Adliya vazirligining rasmiy Lex.uz bazasidagi amaldagi moddalari taqdim etilmoqda:\n\n` +
+        matchedArticles.slice(0, 5).map((a, idx) => (
+          `[MODDA ${idx + 1}]: ${a.codeName} (${a.articleNumber}, «${a.articleTitle}»)\n` +
+          `Amaldagi tahrir: ${a.effectiveDate} | Status: AMALDAGI (${a.editionStatus})\n` +
+          `Rasmiy norma matni: "${a.content}"\n` +
+          `Rasmiy Lex.uz havolasi: ${a.lexUrl}`
+        )).join('\n\n') +
+        `\n--- [RASMIY BAZA YAKUNI]\nQAT‘IY TALAB: Javobingizdagi "legalBasis" va tahlilingizni FAQAT ushbu amaldagi normalarga va boshqa amaldagi O‘zbekiston qonunlariga tayangan holda bering. Eskirgan (bekor qilingan) qonunlarni (masalan, 1995-yilgi Mehnat kodeksini) yoki boshqa davlatlar qonunlarini qo‘llash QAT‘IYAN TAQIQLANADI!\n\n`;
+    }
+
+    promptText += `${ragContext}Yangi savol/holat: ${message || 'Iltimos, ilova qilingan hujjat yoki audio yozuvni O‘zbekiston qonunchiligi (Lex.uz) bo‘yicha chuqur tahlil qilib, rasmiy yuridik xulosa bering.'}\n\nJavobni faqat O‘zbekiston qonunlariga (Lex.uz) tayangan holda belgilangan JSON formatda bering.`;
 
     promptParts.push({ text: promptText });
 
@@ -413,6 +459,81 @@ app.post('/api/gemini/legal-consult', async (req, res) => {
     const fallbackConsult = synthesizeOfflineLegalConsult(userQuery, normAttachments);
 
     const parsed = safeExtractJson(textOutput, fallbackConsult);
+
+    // Strict Lex.uz Citation Verification and Normalization
+    if (parsed && Array.isArray(parsed.legalBasis)) {
+      parsed.legalBasis = parsed.legalBasis.map((cit: any) => {
+        const validation = validateCitation({
+          documentName: cit.documentName,
+          articleNumber: cit.articleNumber,
+          quote: cit.quote,
+          lexUrl: cit.lexUrl,
+          editionDate: cit.editionDate,
+        });
+
+        const isCurrent = validation.verdict === 'VERIFIED_CURRENT';
+        const isRepealed = validation.verdict === 'REPEALED';
+        const isVerified = isCurrent || validation.verdict === 'VERIFIED_HISTORICAL';
+
+        const docName = validation.matchedDocumentName || cit.documentName;
+        const artNum = validation.matchedArticleNumber || cit.articleNumber;
+        const canonicalLexUrl = sanitizeLexUrl(cit.lexUrl || validation.matchedOfficialUrl, docName, artNum);
+
+        const enrichedCit = {
+          ...cit,
+          documentName: docName,
+          articleNumber: artNum,
+          lawNumber: cit.lawNumber || validation.matchedLawNumber,
+          isLexVerified: isVerified && isCurrent,
+          verifiedDetails: validation.evidenceSummary,
+          status: isCurrent ? ('CURRENT' as const) : isRepealed ? ('REPEALED' as const) : ('UNVERIFIED' as const),
+          verdict: validation.verdict,
+          evidenceSummary: validation.evidenceSummary,
+          repealedNote: isRepealed ? validation.evidenceSummary : cit.repealedNote,
+          editionDate: cit.editionDate || (isCurrent ? 'Amaldagi tahrir (2026-yil)' : 'Amaldagi emas'),
+          lexUrl: canonicalLexUrl,
+        };
+        const versionComparison = compareMetadataVersionStamps(enrichedCit);
+        return {
+          ...enrichedCit,
+          versionStamp: versionComparison.aiVersionStamp,
+          versionComparison,
+        };
+      });
+
+      // Also sanitize attachedMediaAudit sentences if present
+      if (parsed.attachedMediaAudit && Array.isArray(parsed.attachedMediaAudit.sentenceBreakdown)) {
+        parsed.attachedMediaAudit.sentenceBreakdown = parsed.attachedMediaAudit.sentenceBreakdown.map((item: any) => ({
+          ...item,
+          lexUrl: sanitizeLexUrl(item.lexUrl, item.associatedLawArticle || '', ''),
+        }));
+      }
+
+      const auditSummary = auditAllMessageCitations(parsed.legalBasis);
+      parsed.overallVersionStampAudit = {
+        totalChecked: auditSummary.totalChecked,
+        matchedCurrent: auditSummary.matchedCurrent,
+        repealedOrOutdated: auditSummary.repealedOrOutdated,
+        allMatchCurrent: auditSummary.allMatchCurrent,
+        auditedAt: auditSummary.auditedAt,
+        lexRegistryVersion: auditSummary.lexRegistryVersion,
+      };
+    }
+
+    // Proactive Obsolete Law detection and warning
+    const queryForObs = userQuery.toLowerCase();
+    const foundObsolete = OBSOLETE_LAW_MAPPINGS.find(m =>
+      queryForObs.includes(m.obsoleteTerm.toLowerCase()) || queryForObs.includes(m.obsoleteArticle.toLowerCase())
+    );
+    if (foundObsolete) {
+      if (!parsed.importantNotes) parsed.importantNotes = [];
+      const hasNote = parsed.importantNotes.some((n: string) => n.includes(foundObsolete.currentArticle));
+      if (!hasNote) {
+        parsed.importantNotes.unshift(
+          `DIQQAT (LEX.UZ RASMIY AMALDAGI NORMASI): ${foundObsolete.explanation}`
+        );
+      }
+    }
 
     // Extract grounding URLs if available
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
@@ -449,35 +570,58 @@ app.post('/api/gemini/legal-consult', async (req, res) => {
 
 // Comprehensive Offline Lex.uz Knowledge Engine
 function synthesizeOfflineLegalConsult(userQuery: string, attachments: any[] = []): any {
-  let category = 'labor';
-  let summaryAnswer = 'Mehnat munosabatlarida har qanday o‘zgarish yoki intizomiy chora Mehnat kodeksining amaldagi normalariga (Lex.uz) qat‘iy muvofiq bo‘lishi shart.';
+  const matched = searchLawsDatabase(userQuery);
+  const primaryMatch = matched[0];
+
+  let category = primaryMatch ? primaryMatch.category : 'labor';
+  let summaryAnswer = primaryMatch 
+    ? `O‘zbekiston Respublikasi ${primaryMatch.codeName} ${primaryMatch.articleNumber} («${primaryMatch.articleTitle}») mezonlariga ko‘ra, ushbu holat bo‘yicha quyidagi qonuniy tartib belgilangan: ${primaryMatch.content.slice(0, 240)}...`
+    : 'O‘zbekiston Respublikasining amaldagi qonunchiligi (Lex.uz) normalariga qat‘iy muvofiq ravishda huquqlaringiz kafolatlanadi.';
+  
   let attachedMediaAudit: any = undefined;
-  let legalBasis: any[] = [
-    {
-      documentName: 'O‘zbekiston Respublikasining Mehnat kodeksi',
-      documentType: 'Kodeks',
-      articleNumber: '161-modda',
-      partNumber: '2-qism',
-      paragraphNumber: '5-band',
-      quote: 'Mehnat shartnomasini bekor qilish va intizomiy jazolarni qo‘llashda qat‘iy qonuniy asoslar hamda xodimdan yozma tushuntirish xati talab qilinadi.',
-      editionDate: '2023-04-30',
-      lexUrl: 'https://lex.uz/docs/6257288#6258900',
-      status: 'CURRENT',
-    },
-  ];
-  let detailedAnalysis = 'Ushbu masala bo‘yicha O‘zbekiston Respublikasi amaldagi qonunchiligi asosida tahlil amalga oshirildi. Savolingizda ko‘rsatilgan holat bo‘yicha tegishli normativ-huquqiy hujjatlarga tayangan holda ish yuritish va barcha dalillarni yozma rasmiylashtirish tavsiya etiladi.';
+  let legalBasis: any[] = matched.length > 0 
+    ? matched.slice(0, 4).map((m) => {
+        const val = validateCitation({
+          documentName: m.codeName,
+          articleNumber: m.articleNumber,
+          quote: m.content,
+          lexUrl: m.lexUrl,
+        });
+        const isCur = val.verdict === 'VERIFIED_CURRENT';
+        const isRep = val.verdict === 'REPEALED';
+        return {
+          documentName: m.codeName,
+          lawNumber: m.lawNumber,
+          documentType: (m.codeId.includes('mk') || m.codeId.includes('fk') || m.codeId.includes('mjtk') || m.codeId.includes('sk') || m.codeId.includes('ok')) ? 'Kodeks' : 'Qonun',
+          articleNumber: m.articleNumber,
+          quote: m.content.slice(0, 240) + '...',
+          editionDate: m.effectiveDate ? `Amaldagi tahrir (${m.effectiveDate})` : 'Amaldagi tahrir: 2026-yil',
+          lexUrl: m.lexUrl,
+          status: isCur ? 'CURRENT' : isRep ? 'REPEALED' : 'UNVERIFIED',
+          isLexVerified: isCur,
+          verifiedDetails: val.evidenceSummary,
+          verdict: val.verdict,
+          repealedNote: m.warningNote,
+        };
+      })
+    : [];
+
+  let detailedAnalysis = primaryMatch
+    ? `Mazkur huquqiy nizo yoki savol yuzasidan O‘zbekiston Respublikasining amaldagi ${primaryMatch.codeName} normalari talab etiladi. ${primaryMatch.articleNumber} bo‘yicha: «${primaryMatch.content}». Barcha harakatlar qonuniy tartibda rasmiylashtirilishi shart.`
+    : 'Ushbu masala bo‘yicha rasmiy Lex.uz bazasida bevosita aniq norma avtomatik topilmadi. Huquqiy kuch tasdiqlanmadi (UNVERIFIED). Tavsiyaviy umumiy tartibda harakat qilish va rasmiy manba bilan aniqlashtirish talab etiladi.';
+
   let practicalSteps = [
     'Tegishli holat yuzasidan barcha yozma hujjatlar (dalolatnoma, buyruq, shartnoma)ni to‘plang.',
-    'Xodimdan yozma tushuntirish xati talab qiling (kamida 2 ish kuni muddat beriladi).',
-    'Kasaba uyushmasi roziligini (agar jamoa shartnomasida nazarda tutilgan bo‘lsa) oling.',
-    'Yakka tartibdagi mehnat nizosini hal qilish uchun nizolar komissiyasiga yoki sudga murojaat qiling.',
+    'Ikkinchi tarafga rasmiy yozma xabarnoma yoki talabnoma (pretenziya) yuboring.',
+    'Nizo kelishuv orqali hal bo‘lmaganda, Lex.uz talablariga mos ravishda da‘vo arizasi bilan tegishli tumanlararo sudga murojaat qiling.',
   ];
+
   let risksAndSanctions = [
-    'Noqonuniy ishdan bo‘shatilgan xodim ishga tiklanadi va unga majburiy progul vaqti uchun o‘rtacha oylik ish haqi to‘lanadi (MK 569-modda).',
-    'Ish beruvchi mansabdor shaxsiga nisbatan MJTKning 49-moddasiga ko‘ra BHMning 5 baravaridan 10 baravarigacha jarima qo‘llanilishi mumkin.',
+    'Qonuniy talablarga rioya qilinmagan bitimlar O‘zR Fuqarolik kodeksining 114-116 moddalariga ko‘ra haqiqiy emas deb topilishi mumkin.',
   ];
+
   let importantNotes = [
-    'Homilador ayollar, 3 yoshgacha bolasi bor ayollar va vaqtincha mehnatga layoqatsizlik davridagi xodimlarni ish beruvchi tashabbusi bilan bo‘shatish taqiqlanadi (MK 163, 408-moddalar).',
+    'O‘zbekiston Respublikasi rasmiy normativ-huquqiy hujjatlar bazasi (Lex.uz) ma‘lumotlariga ko‘ra, har qanday talab da‘vo muddati (odatda 3 yil) ichida qo‘yilishi kerak.',
   ];
 
   if (userQuery.includes('aliment') || userQuery.includes('farzand') || userQuery.includes('bola') || userQuery.includes('nikoh') || userQuery.includes('oila')) {
@@ -1181,8 +1325,8 @@ Javobni quyidagi JSON formatida bering:
         thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         responseMimeType: 'application/json',
       },
-      'gemini-3.7-flash',
-      ['gemini-3.1-flash-lite', 'gemini-flash-latest']
+      'gemini-3.1-flash-lite',
+      ['gemini-flash-latest', 'gemini-3.8-flash']
     );
 
     const fallbackAnalysis = synthesizeOfflineContractAnalysis(contractText, contractType);
@@ -1453,44 +1597,7 @@ ${docType.toUpperCase()} МАТНИ:
 Мурожаатчи / Ижрочи: ___________ ${employeeName}`;
 }
 
-// 4. Audio Transcription Endpoint (Microphone Speech to Text)
-app.post('/api/gemini/transcribe', async (req, res) => {
-  try {
-    const { audioData, mimeType = 'audio/webm' } = req.body;
-    if (!audioData) {
-      return res.status(400).json({ error: 'Audio data is required' });
-    }
 
-    const ai = getGenAI();
-    const cleanBase64 = audioData.replace(/^data:audio\/\w+;base64,/, '');
-
-    const response = await callGeminiSafe(
-      ai,
-      'gemini-3.8-flash',
-      'gemini-3.1-flash-lite',
-      {
-        contents: {
-          parts: [
-          {
-            inlineData: {
-              mimeType,
-              data: cleanBase64,
-            },
-          },
-          {
-            text: 'Ushbu audio yozuvdagi so‘zlarni aniq o‘zbek tilida (yoki gapirilgan tilda) transkripsiya qilib bering. Faqat aytilgan matnni qaytaring, boshqa hech qanday izoh qo‘shmang.',
-          },
-        ],
-      },
-    }
-  );
-
-    res.json({ text: response.text?.trim() || '' });
-  } catch (error: any) {
-    console.warn('[LexAI Transcribe] Notice:', error?.message || error);
-    res.json({ text: '' });
-  }
-});
 
 // 5. Text-To-Speech (TTS) Endpoint
 app.post('/api/gemini/tts', async (req, res) => {
@@ -1960,131 +2067,215 @@ Javobni quyidagi qat‘iy JSON formatida qaytaring:
   }
 });
 
-// 8. Real-time Lex.uz Citation Verification Endpoint
+// 8. Authoritative Fail-Closed Lex.uz Citation Verification Endpoint
 app.post('/api/lex/verify-citation', async (req, res) => {
-  const { lexUrl = '', documentName = '', articleNumber = '', quote = '', editionDate = '' } = req.body;
+  const { lexUrl = '', documentName = '', articleNumber = '', quote = '', editionDate = '', targetDateContext } = req.body;
 
   try {
-    const ai = getGenAI();
-    const prompt = `O‘zbekiston Respublikasi qonunchiligi (Lex.uz) bo‘yicha ushbu normaning amaldagi huquqiy holatini tekshiring:
-- Hujjat nomi: "${documentName}"
-- Modda raqami: "${articleNumber}"
-- Rasmiy havola: "${lexUrl}"
-- Iqtibos matni: "${quote}"
-- Ko‘rsatilgan tahrir: "${editionDate}"
-
-Savollar:
-1. Ushbu qonun va modda hozirgi kunda AMALDAMI (ACTIVE), yaqinda O‘ZGARTIRISH KIRITILGANMI (RECENTLY_AMENDED), yoki KUCHINI YO‘QOTGANMI (REPEALED)?
-2. Ushbu hujjatga so‘nggi yillarda qaysi Qonun (O‘RQ) bilan qanday o‘zgartirish kiritilgan?
-3. Lex.uz dagi amaldagi matni o‘zgarganmi?
-
-Javobni quyidagi qat‘iy JSON formatida qaytaring:
-{
-  "status": "ACTIVE | RECENTLY_AMENDED | REPEALED | REVISED",
-  "statusLabel": "Amaldagi tahrir (Kuchda) | O‘zgartirish kiritilgan (Yangilangan) | Kuchini yo‘qotgan",
-  "isLatestEdition": true,
-  "lastAmendedLaw": "So‘nggi o‘zgartirish kiritgan O‘RQ raqami va sanasi yoki 'O‘zgarishsiz amalda'",
-  "notes": "Moddaning amaldagi yuridik kuchi va fuqarolar/sudlar uchun amaliy ahamiyati haqida qisqa tushuntirish",
-  "officialSource": "Lex.uz Milliy qonunchilik bazasi",
-  "confidence": "VERIFIED"
-}`;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite',
-      contents: prompt,
-      config: {
-        systemInstruction: 'Siz O‘zbekiston Respublikasi Adliya vazirligining Lex.uz rasmiy qonunchilik bazasi bo‘yicha professional normativ-huquqiy audit tizimisiz. Faqat haqiqiy qonuniy faktlar asosida javob bering.',
-        responseMimeType: 'application/json',
-      },
-    });
-
-    const parsed = JSON.parse(response.text?.trim() || '{}');
-    const verificationResult = {
-      lexUrl,
-      documentName,
-      articleNumber,
-      status: parsed.status || 'ACTIVE',
-      statusLabel: parsed.statusLabel || 'Amaldagi tahrir (Kuchda)',
-      isLatestEdition: parsed.isLatestEdition ?? true,
-      lastAmendedLaw: parsed.lastAmendedLaw || 'O‘zR amaldagi normativ-huquqiy bazasi',
-      lastVerifiedAt: new Date().toISOString(),
-      notes: parsed.notes || 'Lex.uz rasmiy bazasi bilan solishtirildi. Moddaning yuridik kuchi amalda.',
-      officialSource: 'Lex.uz Milliy qonunchilik bazasi',
-      confidence: 'VERIFIED',
+    const cacheManager = LegalCacheManager.getInstance();
+    const cacheParams = {
+      docId: documentName || lexUrl,
+      articleNumber: articleNumber || 'unknown',
+      targetDate: targetDateContext || 'today',
     };
 
-    return res.json(verificationResult);
+    // Check cache
+    const cached = cacheManager.get(cacheParams);
+    if (cached.hit && !cached.isStale && cached.data) {
+      const data = cached.data.evidence;
+      const isCurrent = data.verdict === 'VERIFIED_CURRENT';
+      return res.json({
+        lexUrl: data.matchedOfficialUrl || lexUrl,
+        documentName: data.matchedDocumentName || documentName,
+        articleNumber: data.matchedArticleNumber || articleNumber,
+        status: isCurrent ? 'ACTIVE' : data.verdict === 'REPEALED' ? 'REPEALED' : data.verdict === 'VERIFIED_HISTORICAL' ? 'REVISED' : 'UNVERIFIED',
+        statusLabel: isCurrent ? 'Lex.uz: Amaldagi tahrir (Kuchda)' : data.evidenceSummary,
+        isLatestEdition: isCurrent,
+        lastAmendedLaw: data.matchedLawNumber || 'O‘zR amaldagi normativ-huquqiy bazasi',
+        lastVerifiedAt: data.lastVerifiedAt,
+        notes: data.evidenceSummary,
+        officialSource: 'Lex.uz Milliy qonunchilik bazasi',
+        confidence: isCurrent ? 'VERIFIED' : 'UNVERIFIED',
+        verdict: data.verdict,
+        evidenceSummary: data.evidenceSummary,
+        discrepancies: data.discrepancies,
+        isVersionMatch: isCurrent,
+      });
+    }
+
+    // 1. Authoritative Validation via CitationValidator
+    const validation = validateCitation({
+      documentName,
+      articleNumber,
+      quote,
+      editionDate,
+      lexUrl,
+      targetDateContext,
+    });
+
+    // 2. Cache Validated Result
+    cacheManager.set(cacheParams, validation);
+
+    const isCurrent = validation.verdict === 'VERIFIED_CURRENT';
+    const isRepealed = validation.verdict === 'REPEALED';
+    const isHistorical = validation.verdict === 'VERIFIED_HISTORICAL';
+    const isNotFound = validation.verdict === 'ARTICLE_NOT_FOUND';
+    const isMismatch = validation.verdict === 'TEXT_MISMATCH' || validation.verdict === 'CITATION_MISMATCH';
+
+    const statusLabel = isCurrent
+      ? 'Lex.uz: Amaldagi tahrir (Kuchda)'
+      : isRepealed
+      ? 'Lex.uz: Kuchini yo‘qotgan (Bekor qilingan)'
+      : isHistorical
+      ? 'Lex.uz: Tarixiy tahrir (Amaldagi emas)'
+      : isNotFound
+      ? 'Modda topilmadi (Mavjud emas)'
+      : isMismatch
+      ? 'Iqtibos yoki norma mos kelmadi'
+      : 'Tasdiqlanmagan norma';
+
+    const statusValue = isCurrent
+      ? 'ACTIVE'
+      : isRepealed
+      ? 'REPEALED'
+      : isHistorical
+      ? 'REVISED'
+      : isNotFound
+      ? 'ARTICLE_NOT_FOUND'
+      : isMismatch
+      ? 'CITATION_MISMATCH'
+      : 'UNVERIFIED';
+
+    const versionComparison = compareMetadataVersionStamps({
+      documentName: validation.matchedDocumentName || documentName,
+      articleNumber: validation.matchedArticleNumber || articleNumber,
+      documentType: 'Qonun',
+      editionDate: editionDate || 'Amaldagi',
+      lexUrl: validation.matchedOfficialUrl || lexUrl || 'https://lex.uz',
+      status: isRepealed ? 'HISTORICAL' : isCurrent ? 'CURRENT' : 'UNVERIFIED',
+      quote,
+    });
+
+    return res.json({
+      lexUrl: validation.matchedOfficialUrl || lexUrl,
+      documentName: validation.matchedDocumentName || documentName,
+      articleNumber: validation.matchedArticleNumber || articleNumber,
+      status: statusValue,
+      statusLabel,
+      isLatestEdition: isCurrent,
+      lastAmendedLaw: validation.matchedLawNumber || 'O‘zR amaldagi normativ-huquqiy bazasi',
+      lastVerifiedAt: validation.lastVerifiedAt,
+      notes: validation.evidenceSummary,
+      officialSource: 'Lex.uz Milliy qonunchilik bazasi',
+      confidence: isCurrent ? 'VERIFIED' : 'UNVERIFIED',
+      versionComparison,
+      aiVersionStamp: versionComparison.aiVersionStamp,
+      lexVersionStamp: versionComparison.lexVersionStamp,
+      isVersionMatch: isCurrent,
+      verdict: validation.verdict,
+      evidenceSummary: validation.evidenceSummary,
+      discrepancies: validation.discrepancies,
+    });
   } catch (error: any) {
-    console.warn('[LexAI Verify Citation] Resilience fallback:', error?.message || error);
-    // Institutional fallback verification based on Uzbekistan Codified Law Registry
-    const fallback = synthesizeOfflineLexVerification(lexUrl, documentName, articleNumber);
-    return res.json(fallback);
+    console.warn('[LexAI Verify Citation] Verification notice:', error?.message || error);
+    // FAIL-CLOSED: Never return ACTIVE or VERIFIED on error!
+    return res.json({
+      lexUrl: lexUrl || 'https://lex.uz',
+      documentName: documentName || 'Noma‘lum hujjat',
+      articleNumber: articleNumber || 'Noma‘lum modda',
+      status: 'SOURCE_UNAVAILABLE',
+      statusLabel: 'Rasmiy manba vaqtincha javob bermadi',
+      isLatestEdition: false,
+      lastAmendedLaw: 'Noma‘lum',
+      lastVerifiedAt: new Date().toISOString(),
+      notes: 'Manba bilan bog‘lanib bo‘lmadi. Huquqiy kuch tasdiqlanmadi.',
+      officialSource: 'Lex.uz Milliy qonunchilik bazasi',
+      confidence: 'UNVERIFIED',
+      verdict: 'SOURCE_UNAVAILABLE',
+      isVersionMatch: false,
+      discrepancies: ['Rasmiy manba tekshiruvi amalga oshmadi'],
+    });
   }
 });
 
-// Helper for institutional offline verification
-function synthesizeOfflineLexVerification(lexUrl: string, docName: string, artNum: string) {
-  const lowerDoc = (docName || '').toLowerCase();
-  const lowerArt = (artNum || '').toLowerCase();
+// 9. Lex.uz URL Proxy and Canonical Redirection Endpoint with SSRF Protection
+app.get('/api/lex/proxy', (req, res) => {
+  const rawUrl = (req.query.url as string) || '';
+  const docName = (req.query.doc as string) || '';
+  const artNum = (req.query.art as string) || '';
+  const isJson = req.query.json === 'true';
 
-  let status: 'ACTIVE' | 'RECENTLY_AMENDED' | 'REPEALED' | 'REVISED' = 'ACTIVE';
-  let statusLabel = 'Amaldagi tahrir (Kuchda)';
-  let isLatestEdition = true;
-  let lastAmendedLaw = 'O‘zR amaldagi normativ-huquqiy bazasi';
-  let notes = 'Ushbu modda Lex.uz rasmiy reyestri bo‘yicha to‘liq kuchga ega va sudlarda asosiy dalil sifatida qabul qilinadi.';
-
-  if (lowerDoc.includes('mehnat') && (lowerDoc.includes('1995') || lexUrl.includes('145261'))) {
-    status = 'REPEALED';
-    statusLabel = 'Kuchini yo‘qotgan (Eski tahrir)';
-    isLatestEdition = false;
-    lastAmendedLaw = 'Yangi Mehnat kodeksi (O‘RQ-798-son, 2023-yil 30-apreldan kuchga kirgan)';
-    notes = '1995-yilgi Mehnat kodeksi o‘z kuchini yo‘qotgan. O‘rniga 2023-yil 30-apreldan yangi Mehnat kodeksi qo‘llaniladi.';
-  } else if (lowerDoc.includes('mehnat')) {
-    status = 'ACTIVE';
-    statusLabel = 'Amaldagi tahrir (2023 Yangi MK)';
-    isLatestEdition = true;
-    lastAmendedLaw = 'O‘zbekiston Respublikasining 2022-yil 28-oktyabrdagi O‘RQ-798-son Qonuni';
-    notes = '2023-yil 30-apreldan amalga kiritilgan yangi Mehnat kodeksining rasmiy moddasi. Barcha talablari to‘liq kuchda.';
-  } else if (lowerDoc.includes('fuqarolik') || lowerDoc.includes('fk')) {
-    status = 'ACTIVE';
-    statusLabel = 'Amaldagi tahrir (Kuchda)';
-    isLatestEdition = true;
-    lastAmendedLaw = 'O‘zbekiston Respublikasining 2024-yilgi O‘RQ-981-son qonunlari bilan so‘nggi to‘ldirishlar';
-    notes = 'Fuqarolik kodeksi O‘zbekiston xususiy huquqining asosiy poydevori hisoblanib, ushbu modda amaldagi yuridik kuchga ega.';
-  } else if (lowerDoc.includes('iste‘molchi') || lowerDoc.includes('iste\'molchi')) {
-    status = 'ACTIVE';
-    statusLabel = 'Amaldagi tahrir (Kuchda)';
-    isLatestEdition = true;
-    lastAmendedLaw = 'O‘zR «Iste‘molchilarning huquqlarini himoya qilish to‘g‘risida»gi Qonuni (N 221-I)';
-    notes = 'Iste‘molchilar huquqlari va tovarlarni almashtirish/qaytarish bo‘yicha qonuniy me‘yorlar to‘liq amal qilmoqda.';
-  } else if (lowerDoc.includes('shartnomaviy-huquqiy') || lowerDoc.includes('670-i')) {
-    status = 'ACTIVE';
-    statusLabel = 'Amaldagi tahrir (Kuchda)';
-    isLatestEdition = true;
-    lastAmendedLaw = '«Xo‘jalik yurituvchi subyektlar faoliyatining shartnomaviy-huquqiy bazasi to‘g‘risida»gi Qonun';
-    notes = 'Xo‘jalik shartnomalari bo‘yicha hisob-kitoblar, neustoyka va penya chegaralari (25-modda) amalda.';
-  } else if (lowerDoc.includes('soliq')) {
-    status = 'ACTIVE';
-    statusLabel = 'Amaldagi tahrir (2020 Yangi SK)';
-    isLatestEdition = true;
-    lastAmendedLaw = '2024-2025 yillar Davlat byudjeti va soliq siyosatiga oid O‘RQ qonunlari';
-    notes = 'Yangi Soliq kodeksining amaldagi tahriri. Soliq imtiyozlari va stavkalari 2026-yilgi byudjet parametrlariga muvofiq.';
+  // SSRF Protection: strictly allow only lex.uz official domains
+  if (rawUrl) {
+    try {
+      const parsedUrl = new URL(rawUrl);
+      const hostname = parsedUrl.hostname.toLowerCase();
+      if (hostname !== 'lex.uz' && hostname !== 'www.lex.uz') {
+        return res.status(403).json({
+          error: 'SSRF_BLOCKED: Faqat rasmiy Lex.uz domeniga ruxsat beriladi',
+        });
+      }
+    } catch {
+      // not a full URL or malformed
+    }
   }
 
-  return {
-    lexUrl,
-    documentName: docName,
-    articleNumber: artNum,
-    status,
-    statusLabel,
-    isLatestEdition,
-    lastAmendedLaw,
-    lastVerifiedAt: new Date().toISOString(),
-    notes,
-    officialSource: 'Lex.uz Milliy qonunchilik bazasi',
-    confidence: 'VERIFIED',
-  };
-}
+  const canonicalUrl = sanitizeLexUrl(rawUrl, docName, artNum);
+
+  if (isJson) {
+    const validation = validateCitation({
+      lexUrl: canonicalUrl,
+      documentName: docName,
+      articleNumber: artNum,
+    });
+    return res.json({
+      originalUrl: rawUrl,
+      canonicalUrl,
+      status: validation.verdict === 'VERIFIED_CURRENT' ? 'CURRENT' : validation.verdict === 'REPEALED' ? 'REPEALED' : 'UNVERIFIED',
+      verdict: validation.verdict,
+      evidenceSummary: validation.evidenceSummary,
+      provider: 'Lex.uz Milliy qonunchilik bazasi',
+      security: 'HTTPS Verified & SSRF Protected',
+    });
+  }
+
+  // Ensure security headers and redirect cleanly to canonical HTTPS Lex.uz URL
+  res.setHeader('Referrer-Policy', 'no-referrer-when-downgrade');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  return res.redirect(302, canonicalUrl);
+});
+
+// 10. Lex.uz Registry Synchronization Status Endpoint
+app.get('/api/lex/sync-status', (req, res) => {
+  const status = legalIngestionService.getSyncStatus();
+  res.json(status);
+});
+
+// 11. Date-Aware Macro Economic & Legal Indicators Endpoint
+app.get('/api/lex/macro-indicators', (req, res) => {
+  const targetDate = (req.query.date as string) || new Date().toISOString();
+  const bhm = getBhmForDate(targetDate);
+  const mhtekm = getMhtekmForDate(targetDate);
+  res.json({
+    targetDate,
+    bhm,
+    mhtekm,
+    generalLimitationYears: 3,
+    laborDisputeLimitationMonths: {
+      reinstatement: 1,
+      generalLabor: 6,
+    },
+    commercialPenaltyCapPercent: 50,
+  });
+});
+
+// 12. Complete Legal Integrity Repository Audit Report Endpoint
+app.get('/api/lex/audit', (req, res) => {
+  const report = runFullRepositoryLegalAudit();
+  res.json(report);
+});
+
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -37,6 +37,7 @@ import {
 import { ContractAnalysisResult, ContractClauseIssue } from '../types';
 import { exportToWordDocx, printDocument } from '../utils/documentExporter';
 import { synthesizeClientContractAudit } from '../utils/offlineLegalEngine';
+import { LexCanonicalLink } from './LexCanonicalLink';
 
 const SAMPLE_CONTRACTS = [
   {
@@ -571,15 +572,15 @@ Audit xulosasi O‘zbekiston Respublikasi Lex.uz qonunchilik bazasi me‘yorlari
                           <Scale className="w-3.5 h-3.5 shrink-0" />
                           <span>Qonuniy asos: <strong>{clause.legalViolationCitation}</strong></span>
                           {clause.lexUrl && (
-                            <a
-                              href={clause.lexUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-0.5 text-cyan-400 hover:text-cyan-300 font-semibold ml-auto"
-                            >
-                              <span>Lex.uz</span>
-                              <ExternalLink className="w-2.5 h-2.5" />
-                            </a>
+                            <LexCanonicalLink
+                              url={clause.lexUrl}
+                              documentName={clause.legalViolationCitation || ''}
+                              label="Lex.uz"
+                              size="xs"
+                              variant="ghost"
+                              className="ml-auto"
+                              showCopyButton={true}
+                            />
                           )}
                         </div>
                       </div>

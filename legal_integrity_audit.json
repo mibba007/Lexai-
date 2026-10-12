@@ -1,0 +1,167 @@
+[
+  {
+    "findingId": "FIND-0001",
+    "severity": "CRITICAL",
+    "file": "server.ts",
+    "line": 2094,
+    "description": "Fail-open verification defect: /api/lex/verify-citation asked LLM to guess active status and defaulted to ACTIVE and VERIFIED on failure.",
+    "evidence": "catch block returned status: 'ACTIVE', isLatestEdition: true, confidence: 'VERIFIED' even when source was unavailable or article didn't exist.",
+    "remediation": "Redesigned /api/lex/verify-citation with deterministic CitationValidator and LegalCacheManager; returns explicit SOURCE_UNAVAILABLE and UNVERIFIED upon errors.",
+    "testReference": "TEST-10-SOURCE-UNAVAILABLE",
+    "resolutionStatus": "RESOLVED"
+  },
+  {
+    "findingId": "FIND-0002",
+    "severity": "CRITICAL",
+    "file": "server.ts",
+    "line": 2170,
+    "description": "Fail-open offline helper: synthesizeOfflineLexVerification hardcoded status: 'ACTIVE' and isLatestEdition: true.",
+    "evidence": "Function hardcoded status: 'ACTIVE' regardless of whether article was located or valid.",
+    "remediation": "Replaced with validateCitation engine that validates against authoritative snapshot and sets accurate verdict.",
+    "testReference": "TEST-06-WRONG-ARTICLE",
+    "resolutionStatus": "RESOLVED"
+  },
+  {
+    "findingId": "FIND-0003",
+    "severity": "CRITICAL",
+    "file": "server.ts",
+    "line": 465,
+    "description": "Unconditional assignment of isLexVerified: true and status: 'CURRENT' in legal consultation endpoint.",
+    "evidence": "parsed.legalBasis.map unconditionally set isLexVerified = true and status = 'CURRENT' for any citation returned by LLM.",
+    "remediation": "Implemented validateCitation pipeline: only provisions verified in force receive isLexVerified: true and status: 'CURRENT'; repealed or unknown norms receive REPEALED or UNVERIFIED.",
+    "testReference": "TEST-01-CURRENT-VERIFIED",
+    "resolutionStatus": "RESOLVED"
+  },
+  {
+    "findingId": "FIND-0004",
+    "severity": "CRITICAL",
+    "file": "src/data/lawsDatabase.ts",
+    "line": 985,
+    "description": "verifyCitationWithLexDb returned status: 'ACTIVE' and confidence: 'VERIFIED' when no article matched in database.",
+    "evidence": "Fallback block returned status: 'ACTIVE', statusLabel: 'Lex.uz: Amaldagi tahrir (2026)', confidence: 'VERIFIED' for unknown articles.",
+    "remediation": "Changed fallback to return status: 'UNVERIFIED', statusLabel: 'Tasdiqlanmagan', confidence: 'UNVERIFIED', isLatestEdition: false.",
+    "testReference": "TEST-06-WRONG-ARTICLE",
+    "resolutionStatus": "RESOLVED"
+  },
+  {
+    "findingId": "FIND-0005",
+    "severity": "CRITICAL",
+    "file": "src/components/LexVerificationBadge.tsx",
+    "line": 89,
+    "description": "Frontend UI badge defaulted to green verified state upon network failure.",
+    "evidence": "catch block in performVerification set status: 'ACTIVE' and default switch case displayed green verified badge.",
+    "remediation": "Updated catch block to set SOURCE_UNAVAILABLE and UNVERIFIED; added distinct badges for REPEALED, REVISED, ARTICLE_NOT_FOUND, and UNVERIFIED; green badge only rendered for ACTIVE verified in-force norms.",
+    "testReference": "TEST-10-SOURCE-UNAVAILABLE",
+    "resolutionStatus": "RESOLVED"
+  },
+  {
+    "findingId": "FIND-0006",
+    "severity": "HIGH",
+    "file": "src/utils/versionStampUtils.ts",
+    "line": 289,
+    "description": "Version stamp comparator defaulted lexCurrentStatus to CURRENT and isVersionMatch to true for unindexed articles.",
+    "evidence": "If dbMatch was not found in laws database, comparator did not flag mismatch or missing article.",
+    "remediation": "Integrated validateCitation directly into compareMetadataVersionStamps: unindexed or missing articles fail closed to UNVERIFIED with isVersionMatch = false.",
+    "testReference": "TEST-06-WRONG-ARTICLE",
+    "resolutionStatus": "RESOLVED"
+  },
+  {
+    "findingId": "FIND-0007",
+    "severity": "HIGH",
+    "file": "server.ts",
+    "line": 1587,
+    "description": "Duplicated endpoint: app.post('/api/gemini/transcribe') defined twice in server.ts.",
+    "evidence": "Line 1001 and line 1587 both registered the same route, leading to ambiguous routing behavior.",
+    "remediation": "Removed redundant route registration at line 1587 and consolidated transcription logic.",
+    "testReference": "TEST-REG-DUPLICATE-ROUTES",
+    "resolutionStatus": "RESOLVED"
+  },
+  {
+    "findingId": "FIND-0008",
+    "severity": "HIGH",
+    "file": "src/components/LegalCalculators.tsx",
+    "line": 39,
+    "description": "Lack of temporal sensitivity in court duty and macro calculations: fixed BHM of 412,000 UZS used for all dates.",
+    "evidence": "Historical disputes from 2021-2023 were computed using 2024/2026 BHM, yielding inaccurate court fees.",
+    "remediation": "Created MacroValuesService with full historical BHM and MHTEKM registries (PF-5723, PF-6155, PF-6279, PF-138, PF-45, PF-196, PF-108); added interactive calculation date picker to LegalCalculators.",
+    "testReference": "TEST-18-MACRO-AMENDMENTS",
+    "resolutionStatus": "RESOLVED"
+  },
+  {
+    "findingId": "FIND-0009",
+    "severity": "HIGH",
+    "file": "server.ts",
+    "line": 2182,
+    "description": "SSRF vulnerability in URL proxy endpoint /api/lex/proxy.",
+    "evidence": "Arbitrary external URLs passed in ?url= query could trigger redirect or proxy without domain validation.",
+    "remediation": "Enforced strict hostname whitelist check: only lex.uz and www.lex.uz are permitted; external hosts or IP literals are blocked with 403 Forbidden.",
+    "testReference": "TEST-SSRF-PROTECTION",
+    "resolutionStatus": "RESOLVED"
+  },
+  {
+    "findingId": "FIND-0010",
+    "severity": "MEDIUM",
+    "file": "src/data/lawsDatabase.ts",
+    "line": 11,
+    "description": "Repealed 1995 Mehnat Kodeksi provisions (100-modda, 134-modda) referenced in user queries.",
+    "evidence": "1995 Labor Code was fully repealed effective 2023-04-30 by Law O‘RQ-798.",
+    "remediation": "Classified as REPEALED in LegalDataRepository with validity interval 1996-04-01 to 2023-04-29; automatic redirection to in-force 161-modda and 217-modda.",
+    "testReference": "TEST-02-REPEALED",
+    "resolutionStatus": "RESOLVED"
+  },
+  {
+    "findingId": "FIND-0011",
+    "severity": "MEDIUM",
+    "file": "src/utils/offlineLegalEngine.ts",
+    "line": 35,
+    "description": "Offline consult fallback injected hardcoded labor code citation (161-modda) when no statute matched query.",
+    "evidence": "When matchedStatutes was empty, legalBasis array was populated with a hardcoded Mehnat kodeksi citation marked as verified.",
+    "remediation": "Updated fallback to return empty legalBasis, confidenceLevel: LOW, and transparent notice that no verified statute was found for the query.",
+    "testReference": "TEST-15-FALLBACK-CONFIDENCE",
+    "resolutionStatus": "RESOLVED"
+  },
+  {
+    "findingId": "FIND-0012",
+    "severity": "MEDIUM",
+    "file": "src/data/lawsDatabase.ts",
+    "line": 878,
+    "description": "searchLawsDatabase lacked stop word filtering, causing common Uzbek grammatical particles to match random articles.",
+    "evidence": "Query 'Noma‘lum mavzu bo‘yicha savol' matched articles because 'bo‘yicha' is present in nearly all legal texts.",
+    "remediation": "Implemented STOP_WORDS filter in searchLawsDatabase; queries containing only functional words without keywords or article numbers return empty results.",
+    "testReference": "TEST-15-FALLBACK-CONFIDENCE",
+    "resolutionStatus": "RESOLVED"
+  },
+  {
+    "findingId": "FIND-0013",
+    "severity": "LOW",
+    "file": "src/components/Navbar.tsx",
+    "line": 70,
+    "description": "Status bar displayed unverified '100% SINXRONLASHTIRILGAN' badge without actual synchronization backend.",
+    "evidence": "Static text claimed 100% synchronization without querying live ingestion service.",
+    "remediation": "Updated Navbar badge to reflect verified in-force edition (2026-yil) and added /api/lex/sync-status administrative endpoint.",
+    "testReference": "TEST-17-SYNC-STATUS",
+    "resolutionStatus": "RESOLVED"
+  },
+  {
+    "findingId": "FIND-0014",
+    "severity": "LOW",
+    "file": "src/services/legal/CacheManager.ts",
+    "line": 1,
+    "description": "Lack of version- and date-aware cache invalidation.",
+    "evidence": "Session storage previously keyed only on URL and article without checking document version or target date.",
+    "remediation": "Implemented LegalCacheManager with compound key (docId:articleNumber:targetDate:checksum), configurable TTL, and stale-cache fail-closed detection.",
+    "testReference": "TEST-12-STALE-CACHE",
+    "resolutionStatus": "RESOLVED"
+  },
+  {
+    "findingId": "FIND-0015",
+    "severity": "LOW",
+    "file": "src/services/legal/LegalIngestionService.ts",
+    "line": 1,
+    "description": "Absence of structured document ingestion quarantine mechanism.",
+    "evidence": "Malformed or incomplete document structures could previously be loaded into application state without structural validation.",
+    "remediation": "Built LegalIngestionService with mandatory field checks, effectiveFrom validation, provision integrity tests, and automatic quarantine logging.",
+    "testReference": "TEST-11-MALFORMED-INGESTION",
+    "resolutionStatus": "RESOLVED"
+  }
+]

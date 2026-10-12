@@ -66,7 +66,7 @@ Yuqoridagilarga asosan, FK 14, 324, 333-moddalari va IPK 149-moddasiga binoan ja
           statusLabel: 'Qonunga zid / Asossiz',
           analysis: 'O‘zbekiston Respublikasi FK 14-moddasi va Oliy Sud Plenumi talablariga binoan, boy berilgan foyda shunchaki taxminiy hisob-kitoblar bilan emas, balki real tayyorgarlik ko‘rilganligi, uchinchi shaxs bilan bekor bo‘lmas shartnoma mavjudligi va aniq xarajatlar tahlili orqali qat‘iy isbotlanishi shart. Da‘vogarda bunday dalillar yo‘q.',
           lexArticle: 'FK 14-modda, 2-qism',
-          lexUrl: 'https://lex.uz/docs/111189#150524',
+          lexUrl: 'https://lex.uz/docs/111189',
           counterArgument: 'Da‘vogar o‘z daromadidan mahrum bo‘lishi muqarrarligini isbotlovchi birlamchi buxgalteriya dalillarini taqdim etmagan. Ushbu vaj quruq da‘vodan iborat.',
         },
         {
@@ -105,7 +105,7 @@ Yuqoridagilarga asosan, FK 14, 324, 333-moddalari va IPK 149-moddasiga binoan ja
           lawArticle: 'FK 256 va 335-moddalar',
           description: 'Da‘vogar avans to‘lovini 40 kunga kechiktirgan, bu esa javobgarga o‘z majburiyatini bajarishni kechiktirish huquqini beradi.',
           practicalAdvantage: 'Barcha jarima va penyalarni 100% ga bekor qilish asosi.',
-          lexUrl: 'https://lex.uz/docs/111189#151020',
+          lexUrl: 'https://lex.uz/docs/111189',
         },
       ],
       strongPoints: [
@@ -259,7 +259,7 @@ Ushbu asossiz ma‘lumot tarqalishi oqibatida xorijiy hamkorimiz 80 000 000 so�
           statusLabel: '100% Qonuniy va Asosli',
           analysis: 'O‘zR FK 100-moddasi 1-qismi va «Ommaviy axborot vositalari to‘g‘risida»gi Qonunning 27-moddasiga ko‘ra, OAV haqiqatga to‘g‘ri kelmaydigan ma‘lumotlar uchun raddiya e‘lon qilishi shart.',
           lexArticle: 'FK 100-modda 1 va 6-qismlari',
-          lexUrl: 'https://lex.uz/docs/111189#153400',
+          lexUrl: 'https://lex.uz/docs/111189',
           counterArgument: 'Javobgar tarqatgan ma‘lumotini tasdiqlovchi birorta ham rasmiy tergov yoki sud hujjati mavjud emas.',
         },
         {
@@ -270,7 +270,7 @@ Ushbu asossiz ma‘lumot tarqalishi oqibatida xorijiy hamkorimiz 80 000 000 so�
           statusLabel: 'Qonuniy Asoslangan',
           analysis: 'FK 100-moddasi 6-qismi yuridik shaxslarga ishchanlik obro‘siga yetkazilgan putur oqibatidagi zararni qoplash huquqini to‘g‘ridan-to‘g‘ri beradi. Kontragentning rasmiy bekor qilish xati sababiy bog‘liqlikni isbotlaydi.',
           lexArticle: 'FK 14-modda, FK 100-modda 6-qismi',
-          lexUrl: 'https://lex.uz/docs/111189#153400',
+          lexUrl: 'https://lex.uz/docs/111189',
           counterArgument: 'Zarar miqdori va bekor qilingan bitim summasi soliq va buxgalteriya hisobotlari bilan to‘liq muvofiq.',
         },
       ],

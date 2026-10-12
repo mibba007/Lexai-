@@ -9,12 +9,21 @@ import {
   Info, 
   ExternalLink,
   CheckCircle2,
-  DollarSign
+  DollarSign,
+  Calendar
 } from 'lucide-react';
-import { OFFICIAL_MACRO_DATA } from '../data/lawsDatabase';
+import { 
+  getBhmForDate, 
+  getMhtekmForDate, 
+  calculateCourtDutyDeterministic, 
+  calculateLaborSeveranceDeterministic, 
+  calculateCommercialPenaltyDeterministic, 
+  calculateAlimonyDeterministic 
+} from '../services/legal/MacroValuesService';
 
 export const LegalCalculators: React.FC = () => {
   const [activeCalc, setActiveCalc] = useState<'court' | 'labor' | 'penalty' | 'alimony'>('court');
+  const [calculationDate, setCalculationDate] = useState<string>(new Date().toISOString().slice(0, 10));
 
   // 1. Court State Duty State
   const [courtType, setCourtType] = useState<'civil_property' | 'civil_nonproperty' | 'civil_divorce' | 'economic_property' | 'admin'>('civil_property');
@@ -34,89 +43,38 @@ export const LegalCalculators: React.FC = () => {
   const [childrenCount, setChildrenCount] = useState<number>(2);
   const [parentMonthlyIncome, setParentMonthlyIncome] = useState<number>(5000000);
 
-  // 1. Calculate Court State Duty (Davlat boji to'g'risida Qonun)
-  const calculateCourtDuty = () => {
-    const BHM = OFFICIAL_MACRO_DATA.BHM;
-    if (courtType === 'civil_property') {
-      const fourPercent = claimAmount * 0.04;
-      const minDuty = BHM; // kamida 1 BHM
-      return Math.max(fourPercent, minDuty);
-    }
-    if (courtType === 'civil_nonproperty') {
-      return BHM * 2; // 2 BHM
-    }
-    if (courtType === 'civil_divorce') {
-      return BHM * 2; // 2 BHM (birinchi nikohda)
-    }
-    if (courtType === 'economic_property') {
-      const twoPercent = claimAmount * 0.02;
-      const minDuty = BHM; // kamida 1 BHM
-      return Math.max(twoPercent, minDuty);
-    }
-    if (courtType === 'admin') {
-      return BHM * 1; // 1 BHM
-    }
-    return 0;
-  };
+  // Macro info for current selected calculation date
+  const currentBhmInfo = getBhmForDate(calculationDate);
+  const currentMhtekmInfo = getMhtekmForDate(calculationDate);
 
-  // 2. Calculate Labor Severance Pay (MK 173-modda) and unused leave
-  const calculateLaborPayout = () => {
-    // Daily wage estimate (25.4 average working days)
-    const dailyWage = monthlySalary / 25.4;
-    const leaveCompensation = dailyWage * unusedLeaveDays;
+  // 1. Deterministic Court State Duty (Davlat boji to'g'risida Qonun O‘RQ-600)
+  const courtDutyResult = calculateCourtDutyDeterministic({
+    courtType,
+    claimAmount,
+    targetDate: calculationDate,
+  });
 
-    let severancePercent = 0.5; // 3 yilgacha 50%
-    if (yearsOfService >= 15) severancePercent = 2.0;
-    else if (yearsOfService >= 10) severancePercent = 1.5;
-    else if (yearsOfService >= 5) severancePercent = 1.0;
-    else if (yearsOfService >= 3) severancePercent = 0.75;
+  // 2. Deterministic Labor Severance Pay (MK 173-modda)
+  const laborResult = calculateLaborSeveranceDeterministic({
+    monthlySalary,
+    yearsOfService,
+    unusedLeaveDays,
+    targetDate: calculationDate,
+  });
 
-    const severancePay = monthlySalary * severancePercent;
-    const totalPayout = leaveCompensation + severancePay;
+  // 3. Deterministic Penalty with Statutory 50% Cap (Qonun 45781, 25-modda; FK 326)
+  const penaltyResult = calculateCommercialPenaltyDeterministic({
+    debtPrincipal,
+    delayDays,
+    dailyRatePercent: penaltyDailyRate,
+  });
 
-    return {
-      leaveCompensation,
-      severancePercent: severancePercent * 100,
-      severancePay,
-      totalPayout,
-    };
-  };
-
-  // 3. Calculate Penalty (FK 327 / Shartnoma)
-  const calculatePenalty = () => {
-    const dailyPenalty = debtPrincipal * (penaltyDailyRate / 100);
-    const totalPenalty = dailyPenalty * delayDays;
-    // O'zbekiston qonunchiligida peniya summasi asosiy qarz summasining 50% idan oshmasligi kerak (Qonun 44427)
-    const cappedPenalty = Math.min(totalPenalty, debtPrincipal * 0.5);
-    const totalPayable = debtPrincipal + cappedPenalty;
-    return { dailyPenalty, totalPenalty, cappedPenalty, totalPayable };
-  };
-
-  // 4. Calculate Alimony (Oila kodeksi 99-modda)
-  const calculateAlimony = () => {
-    let rate = 0.25;
-    if (childrenCount === 2) rate = 0.3333;
-    if (childrenCount >= 3) rate = 0.5;
-
-    const calculatedAlimony = parentMonthlyIncome * rate;
-    // Har bir bola uchun eng kam miqdor MHTEKM ning 26.5% dan kam bo'lmasligi kerak
-    const minPerChild = OFFICIAL_MACRO_DATA.MHTEKM * 0.265;
-    const totalMinAlimony = minPerChild * childrenCount;
-
-    const finalAlimony = Math.max(calculatedAlimony, totalMinAlimony);
-    return {
-      rate: Math.round(rate * 100),
-      calculatedAlimony,
-      minPerChild,
-      totalMinAlimony,
-      finalAlimony,
-    };
-  };
-
-  const courtDutyResult = calculateCourtDuty();
-  const laborResult = calculateLaborPayout();
-  const penaltyResult = calculatePenalty();
-  const alimonyResult = calculateAlimony();
+  // 4. Deterministic Alimony with Statutory Minimum Floor (Oila kodeksi 99-modda)
+  const alimonyResult = calculateAlimonyDeterministic({
+    childrenCount,
+    parentMonthlyIncome,
+    targetDate: calculationDate,
+  });
 
   return (
     <div className="max-w-7xl mx-auto p-2 sm:p-4 space-y-6">
@@ -132,19 +90,30 @@ export const LegalCalculators: React.FC = () => {
           </p>
         </div>
 
-        {/* Macro Card Banner */}
-        <div className="bg-slate-950 px-4 py-2.5 rounded-xl border border-slate-800 flex items-center gap-4 text-xs font-mono">
+        {/* Date Selector & Macro Card Banner */}
+        <div className="bg-slate-950 px-4 py-2.5 rounded-xl border border-slate-800 flex flex-wrap items-center gap-4 text-xs font-mono">
+          <div className="flex items-center gap-1.5 bg-slate-900 px-2.5 py-1.5 rounded-lg border border-slate-700/80">
+            <Calendar className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <span className="text-slate-400 text-[10px]">Hisoblash sanasi:</span>
+            <input
+              type="date"
+              value={calculationDate}
+              onChange={(e) => setCalculationDate(e.target.value || new Date().toISOString().slice(0, 10))}
+              className="bg-transparent text-white text-xs outline-hidden font-mono cursor-pointer"
+            />
+          </div>
           <div>
-            <span className="text-slate-400 block text-[10px]">BHM (BRV):</span>
-            <span className="text-cyan-400 font-bold">{OFFICIAL_MACRO_DATA.BHM.toLocaleString()} so‘m</span>
+            <span className="text-slate-400 block text-[10px]">BHM ({currentBhmInfo.isCurrent ? 'Amaldagi' : 'Tarixiy'}):</span>
+            <span className="text-cyan-400 font-bold">{currentBhmInfo.value.toLocaleString()} so‘m</span>
           </div>
           <div className="h-6 w-px bg-slate-800"></div>
           <div>
-            <span className="text-slate-400 block text-[10px]">MHTEKM (Min oylik):</span>
-            <span className="text-emerald-400 font-bold">{OFFICIAL_MACRO_DATA.MHTEKM.toLocaleString()} so‘m</span>
+            <span className="text-slate-400 block text-[10px]">MHTEKM:</span>
+            <span className="text-emerald-400 font-bold">{currentMhtekmInfo.value.toLocaleString()} so‘m</span>
           </div>
         </div>
       </div>
+
 
       {/* Tabs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -249,24 +218,25 @@ export const LegalCalculators: React.FC = () => {
             <div>
               <span className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Hisoblangan Davlat Boji:</span>
               <div className="text-3xl sm:text-4xl font-black text-cyan-400 font-mono mt-2 mb-4">
-                {Math.round(courtDutyResult).toLocaleString()} so‘m
+                {courtDutyResult.duty.toLocaleString()} so‘m
               </div>
 
               <div className="space-y-2 text-xs text-slate-300 pt-3 border-t border-slate-800">
                 <div className="flex justify-between">
                   <span className="text-slate-400">Qonuniy asos:</span>
-                  <span className="font-semibold text-white">O‘RQ-600-son Qonun, 5-modda</span>
+                  <span className="font-semibold text-white">{courtDutyResult.legalBasis}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Joriy BHM stavkasi:</span>
-                  <span className="font-semibold text-cyan-300">{OFFICIAL_MACRO_DATA.BHM.toLocaleString()} so‘m</span>
+                  <span className="text-slate-400">Qo‘llanilgan BHM ({calculationDate}):</span>
+                  <span className="font-semibold text-cyan-300">{currentBhmInfo.value.toLocaleString()} so‘m</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Kamida to‘lanadigan chegara:</span>
-                  <span className="font-semibold text-emerald-300">1 BHM ({OFFICIAL_MACRO_DATA.BHM.toLocaleString()} so‘m)</span>
+                  <span className="text-slate-400">Hisoblash formulasi:</span>
+                  <span className="font-semibold text-emerald-300">{courtDutyResult.formula}</span>
                 </div>
               </div>
             </div>
+
 
             <div className="mt-6 bg-cyan-950/30 p-3 rounded-xl border border-cyan-800/40 text-[11px] text-cyan-200/90 flex items-start gap-2">
               <Info className="w-4 h-4 text-cyan-400 flex-shrink-0 mt-0.5" />
@@ -419,21 +389,21 @@ export const LegalCalculators: React.FC = () => {
             <div>
               <span className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Hisoblangan Peniya Summasi:</span>
               <div className="text-3xl sm:text-4xl font-black text-amber-400 font-mono mt-2 mb-4">
-                {Math.round(penaltyResult.cappedPenalty).toLocaleString()} so‘m
+                {penaltyResult.statutoryTotalPenalty.toLocaleString()} so‘m
               </div>
 
               <div className="space-y-2.5 text-xs text-slate-300 pt-3 border-t border-slate-800">
                 <div className="flex justify-between">
                   <span className="text-slate-400">Jami undiriladigan (Qarz + Peniya):</span>
-                  <span className="font-bold text-white font-mono text-sm">{Math.round(penaltyResult.totalPayable).toLocaleString()} so‘m</span>
+                  <span className="font-bold text-white font-mono text-sm">{penaltyResult.totalPayable.toLocaleString()} so‘m</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Kunlik peniya miqdori:</span>
-                  <span className="font-semibold text-amber-300 font-mono">{Math.round(penaltyResult.dailyPenalty).toLocaleString()} so‘m/kun</span>
+                  <span className="font-semibold text-amber-300 font-mono">{Math.round(debtPrincipal * (penaltyDailyRate / 100)).toLocaleString()} so‘m/kun</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Qonuniy 50% chegarasi:</span>
-                  <span className="font-semibold text-slate-300">{Math.round(debtPrincipal * 0.5).toLocaleString()} so‘m</span>
+                  <span className="font-semibold text-slate-300">{penaltyResult.maxCap.toLocaleString()} so‘m</span>
                 </div>
               </div>
             </div>
@@ -512,13 +482,13 @@ export const LegalCalculators: React.FC = () => {
                 <div className="flex justify-between">
                   <span className="text-slate-400">Har bir bola uchun qonuniy eng kam miqdor:</span>
                   <span className="font-semibold text-cyan-300 font-mono">
-                    {Math.round(alimonyResult.minPerChild).toLocaleString()} so‘m (MHTEKM ning 26.5%)
+                    {alimonyResult.minFloorPerChild.toLocaleString()} so‘m (MHTEKM ning 26.5%)
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Jami eng kam kafolatlangan miqdor:</span>
                   <span className="font-semibold text-emerald-300 font-mono">
-                    {Math.round(alimonyResult.totalMinAlimony).toLocaleString()} so‘m
+                    {alimonyResult.totalMinFloor.toLocaleString()} so‘m
                   </span>
                 </div>
               </div>

@@ -12,6 +12,7 @@ import { ContractAnalyzer } from './components/ContractAnalyzer';
 import { DisputeIntelligence } from './components/DisputeIntelligence';
 import { DocumentGenerator } from './components/DocumentGenerator';
 import { LegalCalculators } from './components/LegalCalculators';
+import { LegalAuditDashboard } from './components/LegalAuditDashboard';
 import { CabinetView } from './components/CabinetView';
 import { MyProfileView } from './components/MyProfileView';
 import { NavigationTab, LegalCitation, LanguageMode, ConsultationDocContext } from './types';
@@ -195,6 +196,8 @@ export default function App() {
         )}
 
         {activeTab === 'calculators' && <LegalCalculators />}
+
+        {activeTab === 'audit' && <LegalAuditDashboard />}
 
         {activeTab === 'cabinet' && (
           <CabinetView

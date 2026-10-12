@@ -27,6 +27,7 @@ import {
   FileCheck
 } from 'lucide-react';
 import { DocumentAIReviewResult, DocumentReviewSuggestion, ReviewSuggestionType } from '../types';
+import { LexCanonicalLink } from './LexCanonicalLink';
 
 interface DocumentAIReviewDrawerProps {
   isOpen: boolean;
@@ -309,15 +310,14 @@ export const DocumentAIReviewDrawer: React.FC<DocumentAIReviewDrawerProps> = ({
                         <Scale className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                         <span className="line-clamp-1">{suggestion.lawViolationCitation}</span>
                       </div>
-                      <a
-                        href={suggestion.lexUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-cyan-400 hover:text-cyan-300 font-semibold shrink-0"
-                      >
-                        <span>Lex.uz</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
+                      <LexCanonicalLink
+                        url={suggestion.lexUrl}
+                        documentName={suggestion.lawViolationCitation}
+                        label="Lex.uz"
+                        size="xs"
+                        variant="ghost"
+                        showCopyButton={true}
+                      />
                     </div>
 
                     {/* Explanation */}

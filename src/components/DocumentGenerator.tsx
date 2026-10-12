@@ -51,10 +51,14 @@ import {
   RotateCcw,
   ChevronRight,
   UserCheck,
-  User
+  User,
+  Bell,
+  Clock,
+  X
 } from 'lucide-react';
 import { LEGAL_DOCUMENT_TEMPLATES } from '../data/documentTemplates';
 import { LegalDocumentTemplate, LegalCategory, ConsultationDocContext } from '../types';
+import { LexCanonicalLink } from './LexCanonicalLink';
 import { 
   exportToWordDocx, 
   exportToPdf,
@@ -85,6 +89,8 @@ import {
   DEFAULT_SAMPLE_USER_PROFILE, 
   formatIndividualRequisites 
 } from '../utils/userProfileManager';
+import { SmartDocumentAlerts } from './SmartDocumentAlerts';
+import { useDocumentExpirationAlerts, ContractType } from '../utils/documentExpirationManager';
 import { Coins } from 'lucide-react';
 
 interface DocumentGeneratorProps {
@@ -206,6 +212,11 @@ export const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
   const { profile, isProfileComplete } = useUserProfile();
   const [profileAutofillRole, setProfileAutofillRole] = useState<'secondParty' | 'firstParty'>('secondParty');
   const [profileAutofillToast, setProfileAutofillToast] = useState<string | null>(null);
+
+  // Smart Expiration Alerts State (In-app dashboard alerts for 30-day contract expiration)
+  const { totalAlertCount, urgentCount, activeAlerts, addContract } = useDocumentExpirationAlerts();
+  const [isAlertsModalOpen, setIsAlertsModalOpen] = useState(false);
+  const [expirationTrackToast, setExpirationTrackToast] = useState<string | null>(null);
 
   // Official Typography & Layout Controls (O‘zDSt 1157:2008)
   const [fontFamily, setFontFamily] = useState<'Times New Roman' | 'Arial' | 'Calibri' | 'Georgia'>('Times New Roman');
@@ -429,6 +440,53 @@ export const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
       );
       setTimeout(() => setProfileAutofillToast(null), 4000);
     }
+  };
+
+  // Instant Smart Expiration Tracking for current contract
+  const handleTrackActiveContractExpiration = () => {
+    const title = selectedTemplate.shortTitle || selectedTemplate.title;
+    let contractType: ContractType = 'other';
+    let termMonths = 12;
+
+    if (selectedTemplate.id.includes('ijara')) {
+      contractType = 'lease';
+      termMonths = 11; // 11-month tax standard per FK 554
+    } else if (selectedTemplate.id.includes('mehnat')) {
+      contractType = 'labor';
+      termMonths = 12;
+    } else if (selectedTemplate.id.includes('ishonchnoma')) {
+      contractType = 'power_of_attorney';
+      termMonths = 36; // 3 years max per FK 139
+    } else if (selectedTemplate.id.includes('xizmat')) {
+      contractType = 'service';
+      termMonths = 12;
+    }
+
+    const expiryDate = new Date();
+    expiryDate.setMonth(expiryDate.getMonth() + termMonths);
+    const expiryDateStr = expiryDate.toISOString().split('T')[0];
+
+    const firstParty = formValues.employerName || formValues.landlordInfo || formValues.companyName || formValues.lessorCompany || '1-taraf (Ish beruvchi / Ijaraga beruvchi)';
+    const secondParty = formValues.employeeName || formValues.tenantInfo || formValues.agentName || formValues.lesseeCompany || (profile?.fullName || '2-taraf (Xodim / Ijarachi / Vakil)');
+
+    addContract({
+      title: `${title} (${String(secondParty).split(',')[0].slice(0, 40)})`,
+      templateId: selectedTemplate.id,
+      contractType,
+      parties: {
+        firstParty: String(firstParty).split(',')[0].slice(0, 60),
+        secondParty: String(secondParty).split(',')[0].slice(0, 60),
+      },
+      startDate: new Date().toISOString().split('T')[0],
+      expiryDate: expiryDateStr,
+      documentNumber: `${selectedTemplate.category.toUpperCase().slice(0, 2)}-${Math.floor(100 + Math.random() * 900)}/${new Date().getFullYear()}`,
+      governingLaw: selectedTemplate.applicableLaw,
+      lexUrl: selectedTemplate.lexUrl,
+      notes: `Hujjatlar generatori orqali ${termMonths} oylik muddatga avtomatik kuzatuvga qo‘shildi. 30 kun va 7 kun qolganda ogohlantiriladi.`,
+    });
+
+    setExpirationTrackToast(`«${title}» amal qilish muddati (${expiryDateStr} gacha) muvaffaqiyatli monitoringga olindi! Tugashiga 30 kun qolganda tizim sizga ogohlantirish beradi.`);
+    setTimeout(() => setExpirationTrackToast(null), 5500);
   };
 
   const handleInputChange = (key: string, value: string) => {
@@ -859,6 +917,23 @@ export const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
             </span>
           </button>
 
+          {/* Dedicated Smart Notifications Expiry Alerts Button */}
+          <button
+            onClick={() => setIsAlertsModalOpen(true)}
+            id="open-smart-alerts-btn"
+            data-testid="smart-notifications-button"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 text-xs font-bold transition shadow-sm cursor-pointer relative"
+            title="30 kun va 7 kun ichida muddati tugaydigan shartnomalar va smart eslatmalar markazi"
+          >
+            <Bell className="w-4 h-4 text-amber-400" />
+            <span>Muddatlar &amp; Alertlar</span>
+            {totalAlertCount > 0 && (
+              <span className="text-[10px] font-black px-1.5 py-0.2 rounded-full bg-rose-600 text-white animate-pulse">
+                {totalAlertCount}
+              </span>
+            )}
+          </button>
+
           {/* Review with AI Button */}
           <button
             onClick={handleReviewWithAI}
@@ -1040,15 +1115,14 @@ export const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                 <span className="text-[11px] text-slate-300 font-medium">
                   {currentSmart.governingLaw}
                 </span>
-                <a
-                  href={currentSmart.lexUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-cyan-400 hover:underline flex items-center gap-1 text-[11px]"
-                >
-                  <span>Lex.uz</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
+                <LexCanonicalLink
+                  url={currentSmart.lexUrl}
+                  documentName={currentSmart.governingLaw}
+                  label="Lex.uz"
+                  size="xs"
+                  variant="ghost"
+                  showCopyButton={true}
+                />
               </div>
 
               {/* Sub-profiles selector if multiple exist */}
@@ -1118,7 +1192,65 @@ export const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
             </button>
           </div>
         )}
+
+        {/* Expiration Tracking Toast Notification */}
+        {expirationTrackToast && (
+          <div className="bg-amber-950/60 border border-amber-500/50 rounded-xl px-3.5 py-2.5 text-xs text-amber-200 flex items-center justify-between shadow-md shadow-amber-950/30 animate-fadeIn">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="font-semibold">{expirationTrackToast}</span>
+            </div>
+            <button
+              onClick={() => setExpirationTrackToast(null)}
+              className="text-amber-400 hover:text-white text-xs font-bold px-1.5"
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* IN-APP DASHBOARD EXPIRATION ALERT BANNER */}
+      {activeAlerts.length > 0 && (
+        <div 
+          id="in-app-expiration-dashboard-alert"
+          className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-950/50 via-slate-900 to-amber-950/40 border border-amber-500/40 text-amber-200 shadow-md shadow-amber-950/20"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0">
+                <Bell className="w-5 h-5 animate-bounce" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="text-xs sm:text-sm font-black text-white">
+                    Smart Alert: {activeAlerts.length} ta shartnoma muddati tugash arafasida!
+                  </h4>
+                  {urgentCount > 0 && (
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-600 text-white animate-pulse">
+                      {urgentCount} ta shoshilinch (≤7 kun)
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-300 mt-0.5">
+                  Eng yaqini: <strong>«{activeAlerts[0].title}»</strong> ({activeAlerts[0].daysRemaining < 0 ? 'Muddati o‘tgan' : `${activeAlerts[0].daysRemaining} kun qoldi`}). Qonuniy ogohlantirish yoki shartnomani uzaytirish (prolongatsiya) tavsiya etiladi.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setIsAlertsModalOpen(true)}
+                id="view-all-expiry-alerts-btn"
+                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-extrabold text-xs transition shadow-md shadow-amber-950/40 flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>Barcha Alertlar ({totalAlertCount})</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* OFFLINE MODE CONTROL & DRAFT STATUS BAR */}
       <div 
@@ -1485,15 +1617,14 @@ export const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                 <Scale className="w-4 h-4 text-cyan-400 shrink-0" />
                 <span className="truncate">{selectedTemplate.applicableLaw}</span>
               </div>
-              <a
-                href={selectedTemplate.lexUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition shrink-0"
-              >
-                <span>Lex.uz</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
+              <LexCanonicalLink
+                url={selectedTemplate.lexUrl}
+                documentName={selectedTemplate.applicableLaw}
+                label="Lex.uz"
+                size="xs"
+                variant="ghost"
+                showCopyButton={true}
+              />
             </div>
 
             {/* Action to auto-fill sample data */}
@@ -1545,6 +1676,18 @@ export const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                 <span>Namunaviy rekvizitlar bilan to‘ldirish</span>
               </button>
             )}
+
+            {/* Quick Track Expiration Button */}
+            <button
+              onClick={handleTrackActiveContractExpiration}
+              id="track-active-contract-expiry-btn"
+              type="button"
+              className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-amber-950/40 hover:bg-amber-900/50 text-xs font-bold text-amber-300 border border-amber-500/40 transition cursor-pointer shadow-sm"
+              title="Ushbu shartnoma muddati tugashini avtomatik kuzatuvga qo‘shish (30 kunlik ogohlantirish)"
+            >
+              <Bell className="w-3.5 h-3.5 text-amber-400" />
+              <span>Shartnoma muddatini kuzatuvga olish (30 kunlik alert)</span>
+            </button>
           </div>
 
           {/* Mode 1: Visual Block Editor */}

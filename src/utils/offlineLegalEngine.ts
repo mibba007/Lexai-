@@ -1,35 +1,48 @@
 import { LegalAnalysisResult, ChatAttachment, ContractAnalysisResult, DisputeAuditResult, LegalCitation } from '../types';
+import { searchLawsDatabase, verifyCitationWithLexDb, OBSOLETE_LAW_MAPPINGS } from '../data/lawsDatabase';
+import { compareMetadataVersionStamps, auditAllMessageCitations } from './versionStampUtils';
+import { sanitizeLexUrl } from './lexUrlSanitizer';
+import { validateCitation } from '../services/legal/CitationValidator';
 
 export function synthesizeClientLegalConsult(userQuery: string, attachments: ChatAttachment[] = []): LegalAnalysisResult {
   const queryLower = (userQuery || '').toLowerCase();
   const primaryAtt = attachments[0];
   const hasAudio = attachments.some(a => a.type === 'audio');
 
-  let category: any = 'labor';
-  let summaryAnswer = 'Mehnat munosabatlarida har qanday o‘zgarish yoki intizomiy chora O‘zbekiston Respublikasi Mehnat kodeksining amaldagi normalariga (Lex.uz) qat‘iy muvofiq bo‘lishi shart.';
-  
-  let legalBasis: LegalCitation[] = [
-    {
-      documentName: 'O‘zbekiston Respublikasining Mehnat kodeksi',
-      documentType: 'Kodeks',
-      articleNumber: '161-modda',
-      partNumber: '2-qism',
-      paragraphNumber: '5-band',
-      quote: 'Mehnat shartnomasini bekor qilish va intizomiy jazolarni qo‘llashda qat‘iy qonuniy asoslar hamda xodimdan yozma tushuntirish xati talab qilinadi.',
-      editionDate: '2023-04-30',
-      lexUrl: 'https://lex.uz/docs/6257288#6258900',
-      status: 'CURRENT',
-    },
-    {
-      documentName: 'O‘zbekiston Respublikasining Mehnat kodeksi',
-      documentType: 'Kodeks',
-      articleNumber: '312-modda',
-      quote: 'Intizomiy jazo qo‘llanilishidan oldin xodimdan yozma ravishda tushuntirish xati talab qilinishi shart.',
-      editionDate: '2023-04-30',
-      lexUrl: 'https://lex.uz/docs/6257288',
-      status: 'CURRENT',
-    },
-  ];
+  // Retrieve authentic statutes from Lex.uz database
+  const matchedStatutes = searchLawsDatabase(userQuery);
+  const primaryStatute = matchedStatutes[0];
+
+  let category: any = primaryStatute ? primaryStatute.category : 'labor';
+  let summaryAnswer = primaryStatute
+    ? `O‘zbekiston Respublikasi ${primaryStatute.codeName} (${primaryStatute.lawNumber ? primaryStatute.lawNumber + ', ' : ''}${primaryStatute.articleNumber} «${primaryStatute.articleTitle}») talablariga ko‘ra, ushbu holat bo‘yicha amaldagi huquqiy tartib: ${primaryStatute.content.slice(0, 240)}...`
+    : 'Ushbu savol bo‘yicha bazada bevosita mos keluvchi tasdiqlangan modda topilmadi. Huquqiy munosabatlarni tartibga soluvchi umumiy qonunchilik mezonlariga asosan harakat qilish tavsiya etiladi.';
+
+  let legalBasis: LegalCitation[] = matchedStatutes.length > 0
+    ? matchedStatutes.slice(0, 4).map((m) => {
+        const val = validateCitation({
+          documentName: m.codeName,
+          articleNumber: m.articleNumber,
+          quote: m.content,
+          lexUrl: m.lexUrl,
+        });
+        const isCur = val.verdict === 'VERIFIED_CURRENT';
+        return {
+          documentName: m.codeName,
+          documentType: (m.codeId.includes('mk') || m.codeId.includes('fk') || m.codeId.includes('mjtk') || m.codeId.includes('sk') || m.codeId.includes('ok')) ? 'Kodeks' : 'Qonun',
+          articleNumber: m.articleNumber,
+          lawNumber: m.lawNumber,
+          quote: m.content.slice(0, 250) + '...',
+          editionDate: m.effectiveDate ? `Amaldagi tahrir (${m.effectiveDate})` : 'Amaldagi tahrir: 2026-yil',
+          lexUrl: m.lexUrl,
+          status: isCur ? ('CURRENT' as const) : ('UNVERIFIED' as const),
+          isLexVerified: isCur,
+          verifiedDetails: val.evidenceSummary,
+          verdict: val.verdict,
+          repealedNote: m.warningNote,
+        };
+      })
+    : [];
 
   let detailedAnalysis = 'O‘zbekiston Respublikasining amaldagi qonunchiligi (Lex.uz) normalari asosida o‘rganib chiqildi. Ko‘rsatilgan masala yuzasidan barcha dalillarni yozma rasmiylashtirish va qonunda belgilangan muddatlar hamda tartib-taomillarga qat‘iy rioya qilish lozim.';
   
@@ -60,7 +73,7 @@ export function synthesizeClientLegalConsult(userQuery: string, attachments: Cha
         partNumber: '1-qism',
         quote: 'Audio va video yozuvlarni taqdim etgan yoki ularni talab qilib olish to‘g‘risida iltimosnoma bergan shaxs bu yozuvlar qachon, kim tomonidan va qanday sharoitlarda amalga oshirilganligini ko‘rsatishi shart.',
         editionDate: 'Amaldagi tahrir',
-        lexUrl: 'https://lex.uz/docs/3517337#3518712',
+        lexUrl: 'https://lex.uz/docs/3517337',
         status: 'CURRENT',
       },
       {
@@ -70,7 +83,7 @@ export function synthesizeClientLegalConsult(userQuery: string, attachments: Cha
         partNumber: '2-qism',
         quote: 'Ish bo‘yicha dalillar guvohlarning ko‘rsatuvlari, yozma va ashyoviy dalillar, audio va video yozuvlar, ekspertlarning xulosalari bilan aniqlanadi.',
         editionDate: 'Amaldagi tahrir',
-        lexUrl: 'https://lex.uz/docs/3517337#3518590',
+        lexUrl: 'https://lex.uz/docs/3517337',
         status: 'CURRENT',
       },
       {
@@ -80,7 +93,7 @@ export function synthesizeClientLegalConsult(userQuery: string, attachments: Cha
         partNumber: '1-qism',
         quote: 'Da‘vo muddatining o‘tishi belgilangan tartibda da‘vo qo‘zg‘atilishi bilan, shuningdek majburiyatli shaxs tomonidan qarz tan olinganligini ko‘rsatuvchi harakatlar qilinishi bilan uziladi.',
         editionDate: 'Amaldagi tahrir',
-        lexUrl: 'https://lex.uz/docs/111189#150912',
+        lexUrl: 'https://lex.uz/docs/111189',
         status: 'CURRENT',
       },
       {
@@ -90,7 +103,7 @@ export function synthesizeClientLegalConsult(userQuery: string, attachments: Cha
         partNumber: '1-qism',
         quote: 'Qarz shartnomasi bo‘yicha bir taraf (qarz beruvchi) ikkinchi tarafga (qarz oluvchiga) pul yoki boshqa ashyolarni mulk qilib beradi, qarz oluvchi esa qaytarish majburiyatini oladi.',
         editionDate: 'Amaldagi tahrir',
-        lexUrl: 'https://lex.uz/docs/111189#156420',
+        lexUrl: 'https://lex.uz/docs/111189',
         status: 'CURRENT',
       },
     ];
@@ -120,7 +133,7 @@ export function synthesizeClientLegalConsult(userQuery: string, attachments: Cha
         partNumber: '1-qism',
         quote: 'Voyaga yetmagan bolalariga aliment to‘lash haqida ota-ona o‘rtasida kelishuv bo‘lmaganda aliment sud tomonidan oylik ish haqi va boshqa daromadining tegishli qismida undiriladi.',
         editionDate: 'Amaldagi tahrir',
-        lexUrl: 'https://lex.uz/docs/104720#104958',
+        lexUrl: 'https://lex.uz/docs/104720',
         status: 'CURRENT',
       },
       {
@@ -156,7 +169,7 @@ export function synthesizeClientLegalConsult(userQuery: string, attachments: Cha
         partNumber: '1-qism',
         quote: 'Iste‘molchi maqbul sifatli nooziq-ovqat tovarini xarid qilgan kundan e‘tiboran 14 kun ichida uni xarid qilingan joydagi sotuvchiga qaytarishga va to‘langan pul summasini qaytarib olishga haqli.',
         editionDate: 'Amaldagi tahrir',
-        lexUrl: 'https://lex.uz/docs/4427#4480',
+        lexUrl: 'https://lex.uz/docs/4427',
         status: 'CURRENT',
       }
     ];
@@ -223,7 +236,7 @@ export function synthesizeClientLegalConsult(userQuery: string, attachments: Cha
           legalMeaning: 'Majburiyatni lozim darajada bajarish to‘g‘risidagi rasmiy talab (FK 236, 242-moddalar). Qarzdorga ijro muddati kechiktirilayotganligi yuzasidan e‘tiroz bildirilmoqda.',
           associatedLawArticle: 'O‘zR Fuqarolik kodeksi 236-modda (Majburiyatlarni lozim darajada bajarish)',
           legalRiskOrEvidentiaryWeight: 'IMPORTANT' as const,
-          lexUrl: 'https://lex.uz/docs/111189#151750',
+          lexUrl: 'https://lex.uz/docs/111189',
         },
         {
           sentenceNumber: 2,
@@ -233,7 +246,7 @@ export function synthesizeClientLegalConsult(userQuery: string, attachments: Cha
           legalMeaning: 'QARZ VA MAJBURIYATNI OG‘ZAKI TAN OLISH (FK 732-modda). Ushbu iqror sud uchun hal qiluvchi dalil bo‘lib, FK 157-moddasi 1-qismiga binoan umumiy 3 yillik da‘vo muddatining o‘tishini uzadi.',
           associatedLawArticle: 'O‘zR Fuqarolik kodeksi 157-modda va 732-modda',
           legalRiskOrEvidentiaryWeight: 'CRITICAL' as const,
-          lexUrl: 'https://lex.uz/docs/111189#150912',
+          lexUrl: 'https://lex.uz/docs/111189',
         },
         {
           sentenceNumber: 3,
@@ -276,17 +289,45 @@ export function synthesizeClientLegalConsult(userQuery: string, attachments: Cha
     };
   }
 
+  const enrichedLegalBasis = (legalBasis || []).map((cit) => {
+    const canonicalLexUrl = sanitizeLexUrl(cit.lexUrl, cit.documentName, cit.articleNumber);
+    const cleanedCit = {
+      ...cit,
+      lexUrl: canonicalLexUrl,
+      status: cit.status,
+    };
+    const comp = compareMetadataVersionStamps(cleanedCit);
+    return {
+      ...cleanedCit,
+      versionStamp: comp.aiVersionStamp,
+      versionComparison: comp,
+    };
+  });
+
+  const overallAudit = auditAllMessageCitations(enrichedLegalBasis);
+  const hasVerifiedNorms = enrichedLegalBasis.some((c) => c.status === 'CURRENT' && c.isLexVerified);
+
   return {
     summaryAnswer,
-    legalBasis,
+    legalBasis: enrichedLegalBasis,
     detailedAnalysis,
     practicalSteps,
     importantNotes,
     risksAndSanctions,
-    confidenceLevel: 'HIGH',
-    editionStatus: 'Amaldagi rasmiy tahrir (Lex.uz bazasi)',
+    confidenceLevel: hasVerifiedNorms ? 'HIGH' : 'LOW',
+    editionStatus: hasVerifiedNorms 
+      ? 'Amaldagi rasmiy tahrir (Lex.uz bazasi)' 
+      : 'Umumiy huquqiy tushuntirish (Tasdiqlangan norma keltirilmagan)',
     category,
     attachedMediaAudit,
+    overallVersionStampAudit: {
+      totalChecked: overallAudit.totalChecked,
+      matchedCurrent: overallAudit.matchedCurrent,
+      repealedOrOutdated: overallAudit.repealedOrOutdated,
+      allMatchCurrent: overallAudit.allMatchCurrent,
+      auditedAt: overallAudit.auditedAt,
+      lexRegistryVersion: overallAudit.lexRegistryVersion,
+    },
   };
 }
 
@@ -314,7 +355,7 @@ export function synthesizeClientContractAudit(contractText: string, contractType
         riskLevel: 'MEDIUM',
         issueDescription: 'O‘zR Iqtisodiy protsessual kodeksining 34-39-moddalariga muvofiq, sudlovga tegishlilik qoidalari va da‘vogarlikdan oldingi majburiy pretenziya tartib-taomili aniq ko‘rsatilishi shart.',
         legalViolationCitation: 'O‘zR IPK 34-moddasi va 148-moddasi',
-        lexUrl: 'https://lex.uz/docs/3518451',
+        lexUrl: 'https://lex.uz/docs/3518496',
         suggestedAlternative: 'Taraflar o‘rtasidagi nizolar da‘vo bildirish (pretenziya) tartibida ko‘riladi (javob berish muddati 15 kun). Kelishuvga erishilmaganda nizo javobgar joylashgan joydagi tegishli tumanlararo iqtisodiy sudida hal qilinadi.',
       }
     ],
@@ -355,7 +396,7 @@ export function synthesizeClientDisputeAudit(
         statusLabel: 'Qisman asosli (Penya kamaytirilishi mumkin)',
         analysis: 'Fuqarolik kodeksining 326-moddasiga muvofiq, sud to‘lanishi lozim bo‘lgan penyani majburiyat buzilishi oqibatlariga nomutanosib deb topsa, uni kamaytirishga haqli.',
         lexArticle: 'O‘zR FK 326-moddasi (Penya miqdorini kamaytirish)',
-        lexUrl: 'https://lex.uz/docs/111189#112952',
+        lexUrl: 'https://lex.uz/docs/111189',
         counterArgument: 'FK 326-moddasini qo‘llab, penya miqdorini asossiz yuqori hisoblanganligi sababli kamaytirish to‘g‘risida sudga iltimosnoma kiritish.',
       }
     ],
@@ -365,7 +406,7 @@ export function synthesizeClientDisputeAudit(
         lawArticle: 'O‘zR IPK 148-moddasi',
         description: 'Qarshi taraf sudga murojaat qilishdan oldin shartnomada nazarda tutilgan majburiy nizoni sudgacha hal qilish (pretenziya) tartibini buzgan bo‘lishi mumkin.',
         practicalAdvantage: 'Sud arizani ko‘rmasdan qoldirishiga yoki qaytarishiga erishish mumkin.',
-        lexUrl: 'https://lex.uz/docs/3518451',
+        lexUrl: 'https://lex.uz/docs/3518496',
       }
     ],
     strongPoints: [
